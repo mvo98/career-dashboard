@@ -1,8 +1,28 @@
+const DIMENSION_ORDER = [
+  'skill_fit',
+  'compensation_fit',
+  'strategic_fit',
+  'domain_fit',
+  'level_fit',
+]
+
+const DIMENSION_LABELS = {
+  skill_fit: 'Skill Fit',
+  compensation_fit: 'Compensation Fit',
+  strategic_fit: 'Strategic Fit',
+  domain_fit: 'Domain Fit',
+  level_fit: 'Level Fit',
+}
+
+function scoreColor(score) {
+  return score >= 70 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626'
+}
+
 function ScoreCircle({ score }) {
   const radius = 52
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (score / 100) * circumference
-  const color = score >= 75 ? '#16a34a' : score >= 55 ? '#d97706' : '#dc2626'
+  const color = scoreColor(score)
 
   return (
     <div className="score-circle-wrapper">
@@ -28,36 +48,79 @@ function ScoreCircle({ score }) {
   )
 }
 
-function Section({ title, items, className }) {
+function ActionBadge({ action }) {
+  const cls = {
+    Apply: 'action-apply',
+    Explore: 'action-explore',
+    Skip: 'action-skip',
+  }[action] || 'action-explore'
+  return <span className={`action-badge ${cls}`}>{action}</span>
+}
+
+function DimensionRow({ label, dimension }) {
+  const { score, weight, reason } = dimension
+  const color = scoreColor(score)
   return (
-    <div className={`result-section ${className}`}>
-      <h3 className="section-title">{title}</h3>
-      <ul className="section-list">
-        {items.map((item, i) => (
-          <li key={i} className="section-item">{item}</li>
-        ))}
-      </ul>
+    <div className="dimension-row">
+      <div className="dimension-top">
+        <span className="dimension-name">{label}</span>
+        <span className="dimension-weight">{Math.round(weight * 100)}% weight</span>
+        <span className="dimension-score" style={{ color }}>{score}</span>
+      </div>
+      <div className="dimension-bar-track">
+        <div
+          className="dimension-bar-fill"
+          style={{ width: `${score}%`, background: color }}
+        />
+      </div>
+      <p className="dimension-reason">{reason}</p>
     </div>
   )
 }
 
 export default function FitResult({ result }) {
-  const { fit_score, strengths, gaps, talking_points } = result
-  const label = fit_score >= 75 ? 'Strong Fit' : fit_score >= 55 ? 'Moderate Fit' : 'Weak Fit'
-  const labelClass = fit_score >= 75 ? 'label-strong' : fit_score >= 55 ? 'label-moderate' : 'label-weak'
+  const {
+    overall_score,
+    action,
+    action_justification,
+    hard_skip_triggered,
+    hard_skip_reason,
+    dimensions,
+    talking_points,
+  } = result
 
   return (
     <div className="fit-result">
-      <div className="score-section">
-        <ScoreCircle score={fit_score} />
-        <div className="score-meta">
-          <span className={`fit-label ${labelClass}`}>{label}</span>
+      <div className="result-header">
+        <ScoreCircle score={overall_score} />
+        <div className="result-header-right">
+          <ActionBadge action={action} />
+          <p className="action-justification">{action_justification}</p>
         </div>
       </div>
-      <div className="result-grid">
-        <Section title="Top 3 Strengths" items={strengths} className="section-strengths" />
-        <Section title="Top 3 Gaps" items={gaps} className="section-gaps" />
-        <Section title="Talking Points" items={talking_points} className="section-talking" />
+
+      {hard_skip_triggered && (
+        <div className="hard-skip-banner">
+          <strong>Hard Skip Triggered — </strong>{hard_skip_reason}
+        </div>
+      )}
+
+      <div className="scorecard">
+        <h3 className="scorecard-title">Dimension Scorecard</h3>
+        <div className="scorecard-rows">
+          {DIMENSION_ORDER.filter(k => dimensions[k]).map(key => (
+            <DimensionRow key={key} label={DIMENSION_LABELS[key]} dimension={dimensions[key]} />
+          ))}
+        </div>
+      </div>
+
+      <div className="talking-section">
+        <h3 className="scorecard-title">Talking Points</h3>
+        <ul className="talking-list">
+          {talking_points.map((pt, i) => (
+            <li key={i} className="talking-item">{pt}</li>
+          ))}
+        </ul>
       </div>
     </div>
   )

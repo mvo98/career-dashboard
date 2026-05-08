@@ -27,7 +27,7 @@ body {
 }
 
 .app {
-  max-width: 1100px;
+  max-width: 860px;
   margin: 0 auto;
   padding: 40px 24px;
 }
@@ -165,10 +165,12 @@ body {
   gap: 28px;
 }
 
-.score-section {
+/* Header: score circle + action */
+
+.result-header {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 28px;
 }
 
 .score-circle-wrapper {
@@ -199,76 +201,166 @@ body {
   font-weight: 500;
 }
 
-.score-meta {
+.result-header-right {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.fit-label {
+/* Action badge */
+
+.action-badge {
   display: inline-block;
-  padding: 6px 18px;
+  padding: 6px 20px;
   border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.action-apply   { background: #dcfce7; color: #15803d; }
+.action-explore { background: #fef3c7; color: #b45309; }
+.action-skip    { background: #fee2e2; color: #dc2626; }
+
+.action-justification {
   font-size: 0.9rem;
-  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1.55;
+  max-width: 520px;
 }
 
-.label-strong  { background: #dcfce7; color: #16a34a; }
-.label-moderate { background: #fef3c7; color: #d97706; }
-.label-weak    { background: #fee2e2; color: #dc2626; }
+/* Hard skip banner */
 
-/* Result grid */
-
-.result-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.4fr;
-  gap: 16px;
-}
-
-@media (max-width: 720px) {
-  .result-grid { grid-template-columns: 1fr; }
-}
-
-.result-section {
-  padding: 18px;
+.hard-skip-banner {
+  padding: 12px 16px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
   border-radius: 8px;
-  background: #f8fafc;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
-.section-title {
+/* Scorecard */
+
+.scorecard-title {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
+  color: var(--text-muted);
   margin-bottom: 14px;
 }
 
-.section-strengths .section-title { color: #16a34a; }
-.section-gaps      .section-title { color: #dc2626; }
-.section-talking   .section-title { color: var(--primary); }
+.scorecard-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
 
-.section-list {
+.dimension-row {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  transition: background 0.15s;
+}
+
+.dimension-row:last-child {
+  border-bottom: none;
+}
+
+.dimension-row:hover {
+  background: #f8fafc;
+}
+
+.dimension-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dimension-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  flex: 1;
+}
+
+.dimension-weight {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.dimension-score {
+  font-size: 1.05rem;
+  font-weight: 800;
+  min-width: 36px;
+  text-align: right;
+}
+
+.dimension-bar-track {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dimension-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s ease;
+}
+
+.dimension-reason {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Talking points */
+
+.talking-section {
+  /* inherits gap from fit-result */
+}
+
+.talking-list {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.section-item {
+.talking-item {
   font-size: 0.875rem;
   color: var(--text);
   line-height: 1.55;
-  padding-left: 16px;
+  padding-left: 18px;
   position: relative;
 }
 
-.section-item::before {
-  content: '•';
+.talking-item::before {
+  content: '→';
   position: absolute;
   left: 0;
+  color: var(--primary);
   font-weight: 700;
 }
 
-.section-strengths .section-item::before { color: #16a34a; }
-.section-gaps      .section-item::before { color: #dc2626; }
-.section-talking   .section-item::before { color: var(--primary); }
+@media (max-width: 600px) {
+  .result-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
