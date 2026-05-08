@@ -5,3 +5,5 @@ __pycache__/
 node_modules/
 .DS_Store
 profile.md
+node_modules/
+backend/.venv/
