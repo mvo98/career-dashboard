@@ -1,3 +1,5 @@
+import React from 'react'
+
 const DIMENSION_ORDER = [
   'skill_fit',
   'compensation_fit',

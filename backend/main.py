@@ -5,7 +5,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import job_fit
+from routers import job_fit, job_search, airtable
 
 app = FastAPI(title="Career Dashboard API")
 
@@ -17,3 +17,5 @@ app.add_middleware(
 )
 
 app.include_router(job_fit.router, prefix="/api")
+app.include_router(job_search.router, prefix="/api")
+app.include_router(airtable.router, prefix="/api")
