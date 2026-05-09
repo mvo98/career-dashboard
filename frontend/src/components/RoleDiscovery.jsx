@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import JobCard, { dedupKey } from './JobCard'
 
 const DEFAULT_TITLES = [
@@ -12,7 +12,9 @@ const DEFAULT_TITLES = [
   'Technical Implementation Specialist',
 ]
 
-export default function RoleDiscovery({ onEvaluate }) {
+const PAGE_SIZE = 10
+
+export default function RoleDiscovery({ onEvaluate, savedJobIds = new Set() }) {
   const [selectedTitles, setSelectedTitles] = useState(new Set(DEFAULT_TITLES))
   const [location, setLocation] = useState('San Diego, CA')
   const [salaryFloor, setSalaryFloor] = useState(85000)
@@ -22,6 +24,7 @@ export default function RoleDiscovery({ onEvaluate }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [searched, setSearched] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   function toggleTitle(title) {
     setSelectedTitles(prev => {
@@ -45,7 +48,7 @@ export default function RoleDiscovery({ onEvaluate }) {
       const data = await res.json()
       setAirtableLookup(data.matches || {})
     } catch {
-      // non-critical — cards just won't show evaluated state
+      // non-critical
     }
   }
 
@@ -58,6 +61,7 @@ export default function RoleDiscovery({ onEvaluate }) {
     setAirtableLookup({})
     setFilterSummary(null)
     setSearched(true)
+    setVisibleCount(PAGE_SIZE)
 
     try {
       const res = await fetch('/api/jobs/search', {
@@ -79,6 +83,44 @@ export default function RoleDiscovery({ onEvaluate }) {
       setLoading(false)
     }
   }
+
+  function handleDismiss(jobId) {
+    const job = jobs.find(j => j.id === jobId)
+    if (job) {
+      const key = dedupKey(job.title, job.company)
+      setAirtableLookup(prev => ({
+        ...prev,
+        [key]: { ...(prev[key] || {}), status: 'Dismissed' },
+      }))
+    }
+  }
+
+  const { hiddenCount, sortedVisible } = useMemo(() => {
+    let hidden = 0
+    const visible = []
+    for (const job of jobs) {
+      const data = airtableLookup[dedupKey(job.title, job.company)]
+      if (data?.status === 'Dismissed' || data?.status === 'Skip' || savedJobIds.has(job.id)) {
+        hidden++
+      } else {
+        visible.push(job)
+      }
+    }
+
+    visible.sort((a, b) => {
+      const aInAt = !!airtableLookup[dedupKey(a.title, a.company)]
+      const bInAt = !!airtableLookup[dedupKey(b.title, b.company)]
+      if (aInAt !== bInAt) return aInAt ? 1 : -1
+      const aDate = a.posted_at ? new Date(a.posted_at) : new Date(0)
+      const bDate = b.posted_at ? new Date(b.posted_at) : new Date(0)
+      return bDate - aDate
+    })
+
+    return { hiddenCount: hidden, sortedVisible: visible }
+  }, [jobs, airtableLookup, savedJobIds])
+
+  const displayedJobs = sortedVisible.slice(0, visibleCount)
+  const hasMore = sortedVisible.length > visibleCount
 
   return (
     <div className="discovery">
@@ -136,10 +178,13 @@ export default function RoleDiscovery({ onEvaluate }) {
         <div className="filter-summary">
           <div className="filter-summary-top">
             <span className="results-count">
-              {jobs.length === 0 ? 'No roles found.' : `${jobs.length} role${jobs.length !== 1 ? 's' : ''} shown`}
+              {sortedVisible.length === 0 ? 'No roles found.' : `${sortedVisible.length} role${sortedVisible.length !== 1 ? 's' : ''} shown`}
             </span>
             {filterSummary.filtered_count > 0 && (
               <span className="filter-removed">{filterSummary.filtered_count} filtered out</span>
+            )}
+            {hiddenCount > 0 && (
+              <span className="filter-hidden">{hiddenCount} role{hiddenCount !== 1 ? 's' : ''} hidden (already decided)</span>
             )}
           </div>
           {filterSummary.breakdown.length > 0 && (
@@ -155,15 +200,25 @@ export default function RoleDiscovery({ onEvaluate }) {
       )}
 
       <div className="job-grid">
-        {jobs.map(job => (
+        {displayedJobs.map(job => (
           <JobCard
             key={job.id}
             job={job}
             onEvaluate={onEvaluate}
+            onDismiss={handleDismiss}
             airtableData={airtableLookup[dedupKey(job.title, job.company)] || null}
           />
         ))}
       </div>
+
+      {hasMore && (
+        <button
+          className="btn-load-more"
+          onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+        >
+          Load Next {Math.min(PAGE_SIZE, sortedVisible.length - visibleCount)} →
+        </button>
+      )}
     </div>
   )
 }

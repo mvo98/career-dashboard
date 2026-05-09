@@ -10,6 +10,7 @@ from models.job_search import JobResult, FilterReason
 
 ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs/us/search"
 REMOTIVE_BASE = "https://remotive.com/api/remote-jobs"
+JOBICY_BASE = "https://jobicy.com/api/v2/remote-jobs"
 SALARY_CEILING_SKIP = 80_000
 HOURLY_ANNUAL_THRESHOLD = 100_000
 
@@ -22,7 +23,7 @@ _HARD_FILTERS: list[tuple[str, str]] = [
     (
         "Startup signals",
         r"fast[\s-]paced startup|fast[\s-]paced and passionate"
-        r"|as we scale\b|founding team|series [ab]\b",
+        r"|as we scale\b|founding team|series [ab]\b|hyper[\s-]?growth",
     ),
     (
         "Wrong domain",
@@ -249,6 +250,7 @@ async def _search_adzuna(
             url=item.get("redirect_url", ""),
             source="Adzuna",
             flags=[],
+            posted_at=item.get("created", ""),
         ))
     return results
 
@@ -288,6 +290,62 @@ async def _search_remotive(
             url=item.get("url", ""),
             source="Remotive",
             flags=[],
+            posted_at=item.get("publication_date", ""),
+        ))
+    return results
+
+
+async def _search_jobicy(
+    client: httpx.AsyncClient,
+    title: str,
+) -> list[JobResult]:
+    try:
+        resp = await client.get(
+            JOBICY_BASE,
+            params={"tag": title, "count": 15},
+            timeout=12,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return []
+
+    results = []
+    for item in data.get("jobs", []):
+        raw_desc = _strip_html(item.get("jobDescription", ""))
+        salary_min = item.get("annualSalaryMin") or None
+        salary_max = item.get("annualSalaryMax") or None
+        currency = item.get("salaryCurrency", "USD")
+
+        if salary_min:
+            salary_min = int(salary_min)
+        if salary_max:
+            salary_max = int(salary_max)
+
+        if currency == "USD":
+            if salary_max and salary_max < SALARY_CEILING_SKIP:
+                continue
+
+        sal_display = (
+            _format_salary(salary_min, salary_max)
+            if (salary_min or salary_max)
+            else (item.get("salary") or "Not listed")
+        )
+
+        job_id = hashlib.md5(f"jobicy:{item.get('id', '')}".encode()).hexdigest()[:12]
+        results.append(JobResult(
+            id=job_id,
+            title=item.get("jobTitle", ""),
+            company=item.get("companyName", "Unknown"),
+            salary_min=salary_min,
+            salary_max=salary_max,
+            salary_display=sal_display,
+            location=item.get("jobGeo", "Remote"),
+            description=raw_desc,
+            url=item.get("url", ""),
+            source="Jobicy",
+            flags=[],
+            posted_at=item.get("pubDate", ""),
         ))
     return results
 
@@ -332,6 +390,7 @@ async def search_jobs(
             for coro in (
                 _search_adzuna(client, title, location, salary_floor),
                 _search_remotive(client, title),
+                _search_jobicy(client, title),
             )
         ]
         batches = await asyncio.gather(*tasks)

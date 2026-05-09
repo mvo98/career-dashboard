@@ -256,6 +256,7 @@ Return a JSON object with this exact structure:
   "action_justification": "<1-2 sentence justification citing the most decisive factor>",
   "hard_skip_triggered": <true | false>,
   "hard_skip_reason": <null or string naming which exact hard skip condition was met>,
+  "extracted_comp": <null or string: salary/compensation found ONLY in the JD description body text. CRITICAL: do NOT extract the "Salary:" header line at the top of this input — that is a pre-populated structured field. Only return a value if the job description body itself mentions compensation (look for phrases like "base salary", "salary range", "compensation", "$X–$Y", "OTE", "total compensation", "pay range"). E.g. "$90k–$120k", "$140,000/yr", "Up to $150k + equity". Return null if comp is not mentioned in the body text.>,
   "dimensions": {{
     "skill_fit": {{
       "score": <integer 0-100>,

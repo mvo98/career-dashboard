@@ -25,18 +25,69 @@ function scoreColor(score) {
   return score >= 70 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626'
 }
 
-export default function JobCard({ job, onEvaluate, airtableData }) {
+function daysAgo(postedAt) {
+  if (!postedAt) return null
+  const d = new Date(postedAt)
+  if (isNaN(d.getTime())) return null
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+// Returns a formatted salary string if an explicit range/amount is mentioned
+// in the description text, otherwise null.
+function scanDescriptionForSalary(text) {
+  if (!text) return null
+
+  // $90k–$120k  /  $90k - $120k  /  $90k to $120k
+  let m = text.match(/\$(\d+(?:\.\d+)?)\s*k\s*(?:[-–—]|to)\s*\$(\d+(?:\.\d+)?)\s*k/i)
+  if (m) {
+    const lo = Math.round(parseFloat(m[1]) * 1000)
+    const hi = Math.round(parseFloat(m[2]) * 1000)
+    if (lo >= 40_000 && hi <= 600_000)
+      return `$${Math.round(lo / 1000)}k–$${Math.round(hi / 1000)}k`
+  }
+
+  // $90,000 – $120,000  /  $90,000 - $120,000
+  m = text.match(/\$(\d{1,3}(?:,\d{3})+)\s*[-–—]\s*\$(\d{1,3}(?:,\d{3})+)/)
+  if (m) {
+    const lo = parseInt(m[1].replace(/,/g, ''), 10)
+    const hi = parseInt(m[2].replace(/,/g, ''), 10)
+    if (lo >= 40_000 && hi <= 600_000)
+      return `$${Math.round(lo / 1000)}k–$${Math.round(hi / 1000)}k`
+  }
+
+  // "base salary of $90k" / "salary: $90,000" / "compensation of $X"
+  m = text.match(/(?:salary|compensation|pay)[^$]{0,40}\$(\d+(?:\.\d+)?)\s*k/i)
+  if (m) {
+    const val = Math.round(parseFloat(m[1]) * 1000)
+    if (val >= 40_000 && val <= 600_000) return `$${Math.round(val / 1000)}k`
+  }
+
+  m = text.match(/(?:salary|compensation|pay)[^$]{0,40}\$(\d{1,3}(?:,\d{3})+)/i)
+  if (m) {
+    const val = parseInt(m[1].replace(/,/g, ''), 10)
+    if (val >= 40_000 && val <= 600_000) return `$${Math.round(val / 1000)}k`
+  }
+
+  return null
+}
+
+export default function JobCard({ job, onEvaluate, onDismiss, airtableData }) {
   const isSkip = airtableData?.status === 'Skip'
   const alreadyEvaluated = !!airtableData
   const [fetching, setFetching] = useState(false)
+  const [dismissing, setDismissing] = useState(false)
 
   const preview = job.description.length > 200
     ? job.description.slice(0, 200).trimEnd() + '…'
     : job.description
 
+  const days = daysAgo(job.posted_at)
+  const isStale = days !== null && days > 30
+  const salaryFromText = scanDescriptionForSalary(job.description)
+
   async function handleEvaluate() {
     if (job.source !== 'Adzuna') {
-      onEvaluate({ jd: buildJDText(job), company: job.company, role: job.title })
+      onEvaluate({ jd: buildJDText(job), company: job.company, role: job.title, url: job.url, source: job.source, jobId: job.id })
       return
     }
     setFetching(true)
@@ -68,8 +119,28 @@ export default function JobCard({ job, onEvaluate, airtableData }) {
       jd: buildJDText({ ...job, description }),
       company: job.company,
       role: job.title,
+      url: job.url,
+      source: job.source,
+      jobId: job.id,
       jdIncomplete: incomplete,
     })
+  }
+
+  async function handleDismiss() {
+    setDismissing(true)
+    try {
+      await fetch('/api/airtable/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: job.company, role: job.title, url: job.url, source: job.source }),
+      })
+      onDismiss(job.id)
+    } catch {
+      // non-critical — local state already updated
+      onDismiss(job.id)
+    } finally {
+      setDismissing(false)
+    }
   }
 
   return (
@@ -99,10 +170,19 @@ export default function JobCard({ job, onEvaluate, airtableData }) {
       </div>
 
       <div className="job-meta">
-        {job.salary_display && job.salary_display !== 'Not listed' && (
-          <span className="job-salary">{job.salary_display}</span>
-        )}
+        {salaryFromText ? (
+          <span className="job-salary-posted">Posted: {salaryFromText}</span>
+        ) : job.salary_display && job.salary_display !== 'Not listed' ? (
+          job.source === 'Adzuna'
+            ? <span className="job-salary-est">~{job.salary_display} (est.)</span>
+            : <span className="job-salary">{job.salary_display}</span>
+        ) : null}
         {job.location && <span className="job-location">{job.location}</span>}
+        {days !== null && (
+          <span className={`job-posted${isStale ? ' job-posted-stale' : ''}`}>
+            {days === 0 ? 'Today' : days === 1 ? '1 day ago' : `${days} days ago`}
+          </span>
+        )}
       </div>
 
       {job.flags.length > 0 && (
@@ -120,15 +200,24 @@ export default function JobCard({ job, onEvaluate, airtableData }) {
         <a href={job.url} target="_blank" rel="noreferrer" className="view-link">
           View posting →
         </a>
-        <button
-          className={`btn-evaluate-sm${isSkip ? ' btn-evaluate-muted' : ''}`}
-          onClick={handleEvaluate}
-          disabled={fetching}
-        >
-          {fetching
-            ? <><span className="spinner" />Fetching JD…</>
-            : alreadyEvaluated ? 'Re-evaluate' : 'Evaluate Fit'}
-        </button>
+        <div className="job-card-actions">
+          <button
+            className="btn-dismiss-sm"
+            onClick={handleDismiss}
+            disabled={dismissing || fetching}
+          >
+            {dismissing ? '…' : 'Dismiss'}
+          </button>
+          <button
+            className={`btn-evaluate-sm${isSkip ? ' btn-evaluate-muted' : ''}`}
+            onClick={handleEvaluate}
+            disabled={fetching || dismissing}
+          >
+            {fetching
+              ? <><span className="spinner" />Fetching JD…</>
+              : alreadyEvaluated ? 'Re-evaluate' : 'Evaluate Fit'}
+          </button>
+        </div>
       </div>
     </div>
   )

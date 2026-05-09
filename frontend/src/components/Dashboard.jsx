@@ -113,6 +113,16 @@ export default function Dashboard({ active }) {
                         <span className="followup-fit">Fit {r.fit_score}</span>
                       )}
                       <span className="followup-date">Applied {r.date_applied}</span>
+                      {r.posting_url && (
+                        <a
+                          href={r.posting_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="followup-apply-link"
+                        >
+                          Apply →
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}
