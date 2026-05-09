@@ -6,12 +6,17 @@ import Dashboard from './components/Dashboard'
 export default function App() {
   const [activeTab, setActiveTab] = useState('discovery')
   const [evaluatorKey, setEvaluatorKey] = useState(0)
-  const [evalInit, setEvalInit] = useState({ jd: '', company: '', role: '', jdIncomplete: false })
+  const [evalInit, setEvalInit] = useState({ jd: '', company: '', role: '', url: '', source: '', jobId: '', jdIncomplete: false })
+  const [savedJobIds, setSavedJobIds] = useState(new Set())
 
-  function handleEvaluateJob({ jd, company = '', role = '', jdIncomplete = false }) {
-    setEvalInit({ jd, company, role, jdIncomplete })
+  function handleEvaluateJob({ jd, company = '', role = '', url = '', source = '', jobId = '', jdIncomplete = false }) {
+    setEvalInit({ jd, company, role, url, source, jobId, jdIncomplete })
     setEvaluatorKey(k => k + 1)
     setActiveTab('evaluator')
+  }
+
+  function handleJobSaved(jobId) {
+    if (jobId) setSavedJobIds(prev => new Set([...prev, jobId]))
   }
 
   return (
@@ -37,7 +42,7 @@ export default function App() {
       </nav>
       <main className="app-main">
         <div style={{ display: activeTab === 'discovery' ? 'block' : 'none' }}>
-          <RoleDiscovery onEvaluate={handleEvaluateJob} />
+          <RoleDiscovery onEvaluate={handleEvaluateJob} savedJobIds={savedJobIds} />
         </div>
         <div style={{ display: activeTab === 'evaluator' ? 'block' : 'none' }}>
           <JobFitEvaluator
@@ -45,7 +50,11 @@ export default function App() {
             initialJD={evalInit.jd}
             initialCompany={evalInit.company}
             initialRole={evalInit.role}
+            initialUrl={evalInit.url}
+            initialSource={evalInit.source}
+            initialJobId={evalInit.jobId}
             initialJDIncomplete={evalInit.jdIncomplete}
+            onSaveSuccess={handleJobSaved}
           />
         </div>
         <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>

@@ -18,6 +18,8 @@ _EVAL_FIELD_SPECS = [
     ("Rationale",      "multilineText",  {}),
     ("Full JD",        "multilineText",  {}),
     ("Date Evaluated", "date",           {"dateFormat": {"name": "iso"}}),
+    ("PostingURL",     "url",            {}),
+    ("Source",         "singleLineText", {}),
 ]
 
 _DIM_MAP = {
@@ -95,6 +97,8 @@ async def save_evaluation(
     rationale: str,
     dimensions: dict[str, Any],
     full_jd: str,
+    url: str = "",
+    source: str = "",
 ) -> dict:
     token, base, table = _cfg()
 
@@ -115,9 +119,54 @@ async def save_evaluation(
             fields["Role"] = role
         if comp:
             fields["Comp"] = comp
+        if url:
+            fields["PostingURL"] = url
+        if source:
+            fields["Source"] = source
         for dim_key, label in _DIM_MAP.items():
             if dim_key in dimensions:
                 fields[label] = dimensions[dim_key]["score"]
+
+        if company and role:
+            payload = {
+                "records": [{"fields": fields}],
+                "performUpsert": {"fieldsToMergeOn": ["Company", "Role"]},
+                "typecast": True,
+            }
+            resp = await client.patch(
+                f"{_AT_BASE}/{base}/{table}",
+                headers=_h(token),
+                content=json.dumps(payload),
+            )
+        else:
+            payload = {"records": [{"fields": fields}], "typecast": True}
+            resp = await client.post(
+                f"{_AT_BASE}/{base}/{table}",
+                headers=_h(token),
+                content=json.dumps(payload),
+            )
+
+        resp.raise_for_status()
+        data = resp.json()
+        created_ids = data.get("createdRecords", [])
+        all_records = data.get("records", [])
+        record_id = created_ids[0] if created_ids else (all_records[0]["id"] if all_records else None)
+        return {"record_id": record_id, "created": bool(created_ids)}
+
+
+async def dismiss_role(company: str, role: str, url: str = "", source: str = "") -> dict:
+    token, base, table = _cfg()
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        fields: dict[str, Any] = {"Status": "Dismissed"}
+        if company:
+            fields["Company"] = company
+        if role:
+            fields["Role"] = role
+        if url:
+            fields["PostingURL"] = url
+        if source:
+            fields["Source"] = source
 
         if company and role:
             payload = {
@@ -179,7 +228,7 @@ async def lookup_roles(roles: list[dict]) -> dict:
 async def get_dashboard() -> dict:
     async with httpx.AsyncClient(timeout=20) as client:
         records = await _fetch_all_records(
-            client, ["Company", "Role", "Fit", "Status", "Date Applied"]
+            client, ["Company", "Role", "Fit", "Status", "Date Applied", "PostingURL"]
         )
 
     by_status: dict[str, int] = {}
@@ -189,11 +238,12 @@ async def get_dashboard() -> dict:
 
     for rec in records:
         f = rec.get("fields", {})
-        status     = f.get("Status") or "Unknown"
-        fit        = f.get("Fit")
-        date_str   = f.get("Date Applied")
-        company    = f.get("Company", "")
-        role       = f.get("Role", "")
+        status      = f.get("Status") or "Unknown"
+        fit         = f.get("Fit")
+        date_str    = f.get("Date Applied")
+        company     = f.get("Company", "")
+        role        = f.get("Role", "")
+        posting_url = f.get("PostingURL", "") or ""
 
         by_status[status] = by_status.get(status, 0) + 1
 
@@ -208,6 +258,7 @@ async def get_dashboard() -> dict:
                         "role":         role,
                         "date_applied": date_str,
                         "fit_score":    int(fit) if fit is not None else None,
+                        "posting_url":  posting_url or None,
                     })
             except ValueError:
                 pass

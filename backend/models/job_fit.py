@@ -20,3 +20,4 @@ class JobFitResponse(BaseModel):
     hard_skip_reason: Optional[str]
     dimensions: dict[str, DimensionScore]
     talking_points: list[str]
+    extracted_comp: Optional[str] = None

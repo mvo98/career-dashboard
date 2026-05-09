@@ -1,15 +1,26 @@
 import React, { useState } from 'react'
 import FitResult from './FitResult'
 
-function extractComp(jd) {
+function extractCompFromJD(jd) {
   const m = jd.match(/^Salary:\s*(.+)$/m)
   return m ? m[1].trim() : ''
 }
 
-export default function JobFitEvaluator({ initialJD = '', initialCompany = '', initialRole = '', initialJDIncomplete = false }) {
+export default function JobFitEvaluator({
+  initialJD = '',
+  initialCompany = '',
+  initialRole = '',
+  initialUrl = '',
+  initialSource = '',
+  initialJobId = '',
+  initialJDIncomplete = false,
+  onSaveSuccess,
+}) {
+  const [mode, setMode] = useState(initialCompany || initialRole ? 'search' : 'manual')
   const [jobDescription, setJobDescription] = useState(initialJD)
   const [company, setCompany] = useState(initialCompany)
   const [role, setRole] = useState(initialRole)
+  const [manualComp, setManualComp] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -44,6 +55,10 @@ export default function JobFitEvaluator({ initialJD = '', initialCompany = '', i
 
   async function autoSave(evalResult) {
     setSaveStatus('saving')
+    const apiSalary = extractCompFromJD(jobDescription)
+    const compValue = mode === 'manual'
+      ? manualComp
+      : (evalResult.extracted_comp || apiSalary || '')
     try {
       const res = await fetch('/api/airtable/save', {
         method: 'POST',
@@ -52,15 +67,18 @@ export default function JobFitEvaluator({ initialJD = '', initialCompany = '', i
           company,
           role,
           fit_score: evalResult.overall_score,
-          comp: extractComp(jobDescription),
+          comp: compValue,
           action: evalResult.action,
           rationale: evalResult.action_justification,
           dimensions: evalResult.dimensions,
           full_jd: jobDescription,
+          url: initialUrl,
+          source: initialSource,
         }),
       })
       if (!res.ok) throw new Error()
       setSaveStatus('saved')
+      onSaveSuccess?.(initialJobId)
     } catch {
       setSaveStatus('error')
     }
@@ -69,9 +87,26 @@ export default function JobFitEvaluator({ initialJD = '', initialCompany = '', i
   return (
     <div className="evaluator">
       <div className="input-section">
+        <div className="mode-toggle">
+          <button
+            className={`mode-btn${mode === 'search' ? ' mode-btn-active' : ''}`}
+            onClick={() => setMode('search')}
+          >
+            From Search
+          </button>
+          <button
+            className={`mode-btn${mode === 'manual' ? ' mode-btn-active' : ''}`}
+            onClick={() => setMode('manual')}
+          >
+            Manual Entry
+          </button>
+        </div>
+
         <div className="eval-meta-row">
           <div className="eval-meta-field">
-            <label className="input-label">Company</label>
+            <label className="input-label">
+              Company{mode === 'manual' && <span className="optional-hint"> (optional)</span>}
+            </label>
             <input
               className="search-input"
               placeholder="e.g. Acme Corp"
@@ -81,7 +116,9 @@ export default function JobFitEvaluator({ initialJD = '', initialCompany = '', i
             />
           </div>
           <div className="eval-meta-field">
-            <label className="input-label">Role</label>
+            <label className="input-label">
+              Role{mode === 'manual' && <span className="optional-hint"> (optional)</span>}
+            </label>
             <input
               className="search-input"
               placeholder="e.g. Solutions Engineer"
@@ -90,7 +127,27 @@ export default function JobFitEvaluator({ initialJD = '', initialCompany = '', i
               disabled={loading}
             />
           </div>
+          {mode === 'manual' && (
+            <div className="eval-meta-field">
+              <label className="input-label">
+                Comp<span className="optional-hint"> (optional)</span>
+              </label>
+              <input
+                className="search-input"
+                placeholder="e.g. $90k–$120k"
+                value={manualComp}
+                onChange={e => setManualComp(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          )}
         </div>
+
+        {mode === 'manual' && (
+          <p className="eval-manual-note">
+            Company, Role, and Comp are optional — they'll be saved to Airtable along with the evaluation.
+          </p>
+        )}
 
         {initialJDIncomplete && (
           <div className="jd-incomplete-warning">
@@ -122,7 +179,7 @@ export default function JobFitEvaluator({ initialJD = '', initialCompany = '', i
       </div>
 
       {error && <div className="error-message">{error}</div>}
-      {result && <FitResult result={result} />}
+      {result && <FitResult result={result} apiSalary={extractCompFromJD(jobDescription)} />}
     </div>
   )
 }

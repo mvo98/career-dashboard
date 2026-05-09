@@ -20,6 +20,7 @@ class JobResult(BaseModel):
     url: str
     source: str
     flags: list[str]
+    posted_at: Optional[str] = None
 
 
 class FilterReason(BaseModel):

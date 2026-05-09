@@ -80,7 +80,7 @@ function DimensionRow({ label, dimension }) {
   )
 }
 
-export default function FitResult({ result }) {
+export default function FitResult({ result, apiSalary }) {
   const {
     overall_score,
     action,
@@ -89,7 +89,14 @@ export default function FitResult({ result }) {
     hard_skip_reason,
     dimensions,
     talking_points,
+    extracted_comp,
   } = result
+
+  const compDisplay = extracted_comp
+    ? { value: extracted_comp, label: 'Comp (from JD)' }
+    : apiSalary
+      ? { value: apiSalary, label: 'Comp (estimated)' }
+      : null
 
   return (
     <div className="fit-result">
@@ -98,6 +105,11 @@ export default function FitResult({ result }) {
         <div className="result-header-right">
           <ActionBadge action={action} />
           <p className="action-justification">{action_justification}</p>
+          {compDisplay && (
+            <p className="extracted-comp">
+              {compDisplay.label}: <strong>{compDisplay.value}</strong>
+            </p>
+          )}
         </div>
       </div>
 
