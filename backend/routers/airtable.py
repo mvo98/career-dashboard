@@ -4,8 +4,10 @@ from models.airtable_models import (
     LookupRequest, LookupResponse,
     DashboardResponse,
     DismissRequest, DismissResponse,
+    RoleListItem, RolesListResponse,
+    UpdateRoleRequest, UpdateRoleResponse,
 )
-from services.airtable import save_evaluation, lookup_roles, get_dashboard, dismiss_role
+from services.airtable import save_evaluation, lookup_roles, get_dashboard, dismiss_role, get_roles_list, update_role
 
 router = APIRouter()
 
@@ -44,6 +46,24 @@ async def dismiss(req: DismissRequest):
     try:
         result = await dismiss_role(company=req.company, role=req.role, url=req.url, source=req.source)
         return DismissResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/airtable/roles", response_model=RolesListResponse)
+async def roles():
+    try:
+        items = await get_roles_list()
+        return RolesListResponse(roles=[RoleListItem(**r) for r in items])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/airtable/role", response_model=UpdateRoleResponse)
+async def update_role_endpoint(req: UpdateRoleRequest):
+    try:
+        result = await update_role(company=req.company, role=req.role, status=req.status, notes=req.notes)
+        return UpdateRoleResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
