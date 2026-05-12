@@ -51,6 +51,33 @@ class DismissResponse(BaseModel):
     created: bool
 
 
+class RoleListItem(BaseModel):
+    company: str
+    role: str
+    fit_score: Optional[int] = None
+    status: Optional[str] = None
+    action: Optional[str] = None
+    date_evaluated: Optional[str] = None
+    materials_generated: bool = False
+    notes: str = ""
+
+
+class RolesListResponse(BaseModel):
+    roles: list[RoleListItem]
+
+
+class UpdateRoleRequest(BaseModel):
+    company: str
+    role: str
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class UpdateRoleResponse(BaseModel):
+    record_id: Optional[str] = None
+    updated: bool
+
+
 class FollowUpRole(BaseModel):
     company: str
     role: str

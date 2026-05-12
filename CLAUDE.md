@@ -26,7 +26,10 @@ GEMINI_API_KEY=
 ADZUNA_APP_ID=
 ADZUNA_APP_KEY=
 ```
-`profile.md` is gitignored — it must exist at the repo root for the fit evaluator and job search filters to work.
+
+Both `profile.md` and `writing_guide.md` are gitignored and must exist at the repo root:
+- `profile.md` — candidate background, skills, work history. Required for the fit evaluator and job search filters.
+- `writing_guide.md` — resume summary formula, cover letter structure, signal mapping table, voice guide, and banned phrases list. Required for the materials generator (`/api/materials/generate`).
 
 ## Architecture
 

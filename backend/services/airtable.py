@@ -17,9 +17,12 @@ _EVAL_FIELD_SPECS = [
     ("Level Fit",      "number",         {"precision": 0}),
     ("Rationale",      "multilineText",  {}),
     ("Full JD",        "multilineText",  {}),
+    ("Notes",          "multilineText",  {}),
     ("Date Evaluated", "date",           {"dateFormat": {"name": "iso"}}),
-    ("PostingURL",     "url",            {}),
-    ("Source",         "singleLineText", {}),
+    ("PostingURL",          "url",            {}),
+    ("Source",              "singleLineText", {}),
+    ("MaterialsGenerated",  "checkbox",       {"icon": "check", "color": "greenBright"}),
+    ("MaterialsDate",       "date",           {"dateFormat": {"name": "iso"}}),
 ]
 
 _DIM_MAP = {
@@ -193,6 +196,116 @@ async def dismiss_role(company: str, role: str, url: str = "", source: str = "")
         all_records = data.get("records", [])
         record_id = created_ids[0] if created_ids else (all_records[0]["id"] if all_records else None)
         return {"record_id": record_id, "created": bool(created_ids)}
+
+
+async def fetch_role_data(company: str, role: str) -> Optional[dict]:
+    async with httpx.AsyncClient(timeout=20) as client:
+        records = await _fetch_all_records(
+            client, ["Company", "Role", "Full JD", "Action", "Fit", "Rationale",
+                     "Skill Fit", "Comp Fit", "Strategic Fit", "Domain Fit", "Level Fit"]
+        )
+
+    target = _dedup_key(role, company)
+    for rec in records:
+        f = rec.get("fields", {})
+        if _dedup_key(f.get("Role", ""), f.get("Company", "")) == target:
+            return {
+                "full_jd":   f.get("Full JD", ""),
+                "action":    f.get("Action", ""),
+                "fit":       int(f["Fit"]) if f.get("Fit") is not None else None,
+                "rationale": f.get("Rationale", ""),
+                "dimensions": {
+                    "skill_fit":    f.get("Skill Fit"),
+                    "comp_fit":     f.get("Comp Fit"),
+                    "strategic_fit":f.get("Strategic Fit"),
+                    "domain_fit":   f.get("Domain Fit"),
+                    "level_fit":    f.get("Level Fit"),
+                },
+            }
+    return None
+
+
+async def save_materials_generated(company: str, role: str) -> None:
+    token, base, table = _cfg()
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        await _ensure_eval_fields(client)
+        fields: dict[str, Any] = {
+            "Company":            company,
+            "Role":               role,
+            "MaterialsGenerated": True,
+            "MaterialsDate":      str(date.today()),
+        }
+        payload = {
+            "records": [{"fields": fields}],
+            "performUpsert": {"fieldsToMergeOn": ["Company", "Role"]},
+            "typecast": True,
+        }
+        resp = await client.patch(
+            f"{_AT_BASE}/{base}/{table}",
+            headers=_h(token),
+            content=json.dumps(payload),
+        )
+        resp.raise_for_status()
+
+
+async def get_roles_list() -> list[dict]:
+    async with httpx.AsyncClient(timeout=20) as client:
+        await _ensure_eval_fields(client)
+        records = await _fetch_all_records(
+            client, ["Company", "Role", "Fit", "Status", "Action",
+                     "Date Evaluated", "MaterialsGenerated", "Notes"]
+        )
+
+    roles = []
+    for rec in records:
+        f = rec.get("fields", {})
+        company = f.get("Company", "")
+        role    = f.get("Role", "")
+        if not company or not role:
+            continue
+        fit = f.get("Fit")
+        if fit is None:
+            continue
+        roles.append({
+            "company":             company,
+            "role":                role,
+            "fit_score":           int(fit),
+            "status":              f.get("Status"),
+            "action":              f.get("Action"),
+            "date_evaluated":      f.get("Date Evaluated"),
+            "materials_generated": bool(f.get("MaterialsGenerated")),
+            "notes":               f.get("Notes") or "",
+        })
+
+    roles.sort(key=lambda x: x.get("date_evaluated") or "", reverse=True)
+    return roles
+
+
+async def update_role(company: str, role: str, status: Optional[str] = None, notes: Optional[str] = None) -> dict:
+    token, base, table = _cfg()
+    async with httpx.AsyncClient(timeout=20) as client:
+        await _ensure_eval_fields(client)
+        fields: dict[str, Any] = {"Company": company, "Role": role}
+        if status is not None:
+            fields["Status"] = status
+        if notes is not None:
+            fields["Notes"] = notes
+        payload = {
+            "records": [{"fields": fields}],
+            "performUpsert": {"fieldsToMergeOn": ["Company", "Role"]},
+            "typecast": True,
+        }
+        resp = await client.patch(
+            f"{_AT_BASE}/{base}/{table}",
+            headers=_h(token),
+            content=json.dumps(payload),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        all_records = data.get("records", [])
+        record_id = all_records[0]["id"] if all_records else None
+        return {"record_id": record_id, "updated": True}
 
 
 async def lookup_roles(roles: list[dict]) -> dict:
