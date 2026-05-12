@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { apiFetch } from '../api'
 
 const FLAG_STYLES = {
   'US citizen required':         { bg: '#fef2f2', color: '#dc2626' },
@@ -94,7 +95,7 @@ export default function JobCard({ job, onEvaluate, onDismiss, airtableData }) {
     let description = job.description
     let incomplete = false
     try {
-      const res = await fetch('/api/jobs/fetch-description', {
+      const res = await apiFetch('/api/jobs/fetch-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: job.url }),
@@ -129,7 +130,7 @@ export default function JobCard({ job, onEvaluate, onDismiss, airtableData }) {
   async function handleDismiss() {
     setDismissing(true)
     try {
-      await fetch('/api/airtable/dismiss', {
+      await apiFetch('/api/airtable/dismiss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ company: job.company, role: job.title, url: job.url, source: job.source }),

@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { apiFetch } from '../api'
+
+const RETRY_DELAYS = [2000, 4000, 8000]
+const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false)
@@ -24,12 +28,13 @@ export default function MaterialsModal({ company, role, onClose }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
+  // null | { attempt: 1|2|3, type: 'overloaded'|'rate_limit' }
+  const [retryState, setRetryState] = useState(null)
 
   useEffect(() => {
     generate()
   }, [])
 
-  // Close on Escape
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -37,22 +42,55 @@ export default function MaterialsModal({ company, role, onClose }) {
   }, [onClose])
 
   async function generate() {
-    try {
-      const res = await fetch('/api/materials/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company, role }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        throw new Error(d.detail || 'Generation failed')
+    setLoading(true)
+    setError(null)
+    setRetryState(null)
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const res = await apiFetch('/api/materials/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company, role }),
+        })
+
+        if (res.ok) {
+          setData(await res.json())
+          setLoading(false)
+          setRetryState(null)
+          return
+        }
+
+        const d = await res.json().catch(() => ({}))
+        const status = res.status
+
+        if ((status === 503 || status === 429) && attempt < 3) {
+          const type = status === 503 ? 'overloaded' : 'rate_limit'
+          setRetryState({ attempt: attempt + 1, type })
+          await sleep(RETRY_DELAYS[attempt])
+          setRetryState(null)
+          continue
+        }
+
+        let msg
+        if (status === 503) {
+          msg = 'Gemini is still experiencing high demand after 3 retries. Please close and try again.'
+        } else if (status === 429) {
+          msg = 'Rate limit still active after 3 retries. Please wait before trying again.'
+        } else {
+          const detail = typeof d.detail === 'string' ? d.detail : 'Generation failed'
+          msg = detail
+        }
+        setError(msg)
+        break
+      } catch (err) {
+        setError(err.message)
+        break
       }
-      setData(await res.json())
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
     }
+
+    setLoading(false)
+    setRetryState(null)
   }
 
   return (
@@ -67,16 +105,26 @@ export default function MaterialsModal({ company, role, onClose }) {
           <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        {loading && (
+        {loading && !retryState && (
           <div className="modal-loading">
             <span className="spinner" style={{ borderColor: 'rgba(0,0,0,0.15)', borderTopColor: '#2563eb' }} />
             Generating with Gemini…
           </div>
         )}
 
+        {retryState && (
+          <div className="modal-loading" style={{ color: '#92400e' }}>
+            <span className="spinner" style={{ borderColor: 'rgba(217,119,6,0.25)', borderTopColor: '#d97706' }} />
+            {retryState.type === 'overloaded'
+              ? `Gemini is experiencing high demand. Retrying… (attempt ${retryState.attempt} of 3)`
+              : `Rate limit reached. Waiting before retrying… (attempt ${retryState.attempt} of 3)`
+            }
+          </div>
+        )}
+
         {error && (
           <div className="modal-body">
-            <div className="error-message">{error}</div>
+            <div className="error-message" style={{ margin: '20px 24px' }}>{error}</div>
           </div>
         )}
 

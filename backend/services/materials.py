@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from google import genai
 from google.genai import types
+from services.gemini import GeminiOverloadedError, GeminiRateLimitError, _classify_gemini_exc
 
 _PROFILE_PATH = Path(__file__).parent.parent.parent / "profile.md"
 _WRITING_GUIDE_PATH = Path(__file__).parent.parent.parent / "writing_guide.md"
@@ -107,12 +108,20 @@ Return a JSON object with this exact structure:
   "proof_point_selected": "<employer/project name + action + outcome from paragraph 2, in one sentence>"
 }}"""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-        ),
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            ),
+        )
+    except Exception as exc:
+        kind = _classify_gemini_exc(exc)
+        if kind == "overloaded":
+            raise GeminiOverloadedError("Gemini is experiencing high demand.") from exc
+        if kind == "rate_limit":
+            raise GeminiRateLimitError("Rate limit reached.") from exc
+        raise
 
     return json.loads(response.text)

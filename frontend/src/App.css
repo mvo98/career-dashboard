@@ -163,6 +163,19 @@ body {
   margin-bottom: 12px;
 }
 
+.retry-status-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #92400e;
+  line-height: 1.5;
+}
+
 /* Result card */
 
 .fit-result {
@@ -609,9 +622,9 @@ body {
   text-transform: uppercase;
 }
 
-.source-adzuna  { background: #eff6ff; color: #2563eb; }
+.source-adzuna   { background: #eff6ff; color: #2563eb; }
 .source-remotive { background: #f0fdf4; color: #16a34a; }
-.source-jobicy  { background: #fdf4ff; color: #7e22ce; }
+.source-remoteok { background: #fff7ed; color: #c2410c; }
 
 .job-meta {
   display: flex;
@@ -1336,37 +1349,6 @@ body {
   position: relative;
 }
 
-.role-notes-input {
-  width: 100%;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid transparent;
-  border-radius: 0;
-  resize: none;
-  outline: none;
-  padding: 2px 4px;
-  font-family: inherit;
-  line-height: 1.5;
-  transition: border-color 0.15s, background 0.15s;
-  min-height: 24px;
-}
-
-.role-notes-input::placeholder { color: #cbd5e1; }
-
-.role-notes-input:focus {
-  border-bottom-color: var(--border);
-  background: #f8fafc;
-}
-
-.notes-saving {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
 
 .btn-materials {
   padding: 6px 14px;
@@ -1393,3 +1375,188 @@ body {
   background: #e2e8f0;
   color: var(--text);
 }
+
+/* ── Roles filter bar ────────────────────────────────────────── */
+
+.roles-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.filter-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-pill:hover { border-color: var(--primary); color: var(--primary); }
+
+.filter-pill-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.filter-pill-active:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+
+.roles-filter-count {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+/* ── Quick action buttons ────────────────────────────────────── */
+
+.role-quick-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-quick {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1.5px solid;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: transparent;
+}
+
+.btn-quick.applied   { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; font-weight: 600; }
+.btn-quick.rejected  { border-color: #fecaca; color: #dc2626; background: #fef2f2; }
+.btn-quick.replied   { border-color: #bbf7d0; color: #16a34a; background: #f0fdf4; }
+.btn-quick.scheduled { border-color: #bae6fd; color: #0284c7; background: #f0f9ff; }
+.btn-quick.offer     { border-color: #ddd6fe; color: #7c3aed; background: #faf5ff; }
+
+.btn-quick.applied:hover   { background: #dbeafe; border-color: #60a5fa; }
+.btn-quick.rejected:hover  { background: #fee2e2; border-color: #f87171; }
+.btn-quick.replied:hover   { background: #dcfce7; border-color: #4ade80; }
+.btn-quick.scheduled:hover { background: #e0f2fe; border-color: #38bdf8; }
+.btn-quick.offer:hover     { background: #ede9fe; border-color: #a78bfa; }
+
+.btn-quick.rejected.btn-quick-open  { background: #fee2e2; border-color: #f87171; }
+.btn-quick.replied.btn-quick-open   { background: #dcfce7; border-color: #4ade80; }
+.btn-quick.scheduled.btn-quick-open { background: #e0f2fe; border-color: #38bdf8; }
+.btn-quick.offer.btn-quick-open     { background: #ede9fe; border-color: #a78bfa; }
+
+/* ── Inline prompt ───────────────────────────────────────────── */
+
+.inline-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.inline-prompt-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.83rem;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.inline-prompt-input:focus { border-color: var(--primary); }
+
+.inline-prompt-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-prompt-confirm {
+  padding: 5px 14px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-prompt-confirm:hover { background: var(--primary-hover); }
+
+.btn-prompt-cancel {
+  padding: 5px 14px;
+  background: #f1f5f9;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-prompt-cancel:hover { background: #e2e8f0; color: var(--text); }
+
+/* ── Notes history ───────────────────────────────────────────── */
+
+.notes-history {
+  max-height: 80px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  padding: 4px 4px 2px;
+  margin-bottom: 2px;
+  border-left: 2px solid var(--border);
+  padding-left: 8px;
+}
+
+.notes-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.notes-add-input {
+  flex: 1;
+  padding: 3px 4px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.notes-add-input:focus { border-bottom-color: var(--border); }
+.notes-add-input::placeholder { color: #cbd5e1; }
+
+.btn-add-note {
+  padding: 2px 10px;
+  background: #f1f5f9;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-add-note:hover { border-color: var(--primary); color: var(--primary); }

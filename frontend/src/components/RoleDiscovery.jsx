@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import JobCard, { dedupKey } from './JobCard'
+import { apiFetch } from '../api'
 
 const DEFAULT_TITLES = [
   'Solutions Engineer',
@@ -37,7 +38,7 @@ export default function RoleDiscovery({ onEvaluate, savedJobIds = new Set() }) {
   async function fetchLookup(foundJobs) {
     if (!foundJobs.length) return
     try {
-      const res = await fetch('/api/airtable/lookup', {
+      const res = await apiFetch('/api/airtable/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -64,7 +65,7 @@ export default function RoleDiscovery({ onEvaluate, savedJobIds = new Set() }) {
     setVisibleCount(PAGE_SIZE)
 
     try {
-      const res = await fetch('/api/jobs/search', {
+      const res = await apiFetch('/api/jobs/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ titles, location, salary_floor: salaryFloor }),

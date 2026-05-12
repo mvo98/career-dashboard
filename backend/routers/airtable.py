@@ -62,7 +62,7 @@ async def roles():
 @router.patch("/airtable/role", response_model=UpdateRoleResponse)
 async def update_role_endpoint(req: UpdateRoleRequest):
     try:
-        result = await update_role(company=req.company, role=req.role, status=req.status, notes=req.notes)
+        result = await update_role(company=req.company, role=req.role, status=req.status, notes=req.notes, date_applied=req.date_applied)
         return UpdateRoleResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

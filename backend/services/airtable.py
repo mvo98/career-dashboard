@@ -282,7 +282,13 @@ async def get_roles_list() -> list[dict]:
     return roles
 
 
-async def update_role(company: str, role: str, status: Optional[str] = None, notes: Optional[str] = None) -> dict:
+async def update_role(
+    company: str,
+    role: str,
+    status: Optional[str] = None,
+    notes: Optional[str] = None,
+    date_applied: Optional[str] = None,
+) -> dict:
     token, base, table = _cfg()
     async with httpx.AsyncClient(timeout=20) as client:
         await _ensure_eval_fields(client)
@@ -291,6 +297,8 @@ async def update_role(company: str, role: str, status: Optional[str] = None, not
             fields["Status"] = status
         if notes is not None:
             fields["Notes"] = notes
+        if date_applied is not None:
+            fields["Date Applied"] = date_applied
         payload = {
             "records": [{"fields": fields}],
             "performUpsert": {"fieldsToMergeOn": ["Company", "Role"]},

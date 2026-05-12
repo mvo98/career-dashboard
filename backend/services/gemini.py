@@ -1,10 +1,29 @@
 import os
 import json
 from pathlib import Path
+from typing import Optional
 from google import genai
 from google.genai import types
 
 _PROFILE_PATH = Path(__file__).parent.parent.parent / "profile.md"
+
+
+class GeminiOverloadedError(Exception):
+    """Gemini returned 503 / service unavailable."""
+
+
+class GeminiRateLimitError(Exception):
+    """Gemini returned 429 / resource exhausted."""
+
+
+def _classify_gemini_exc(exc: Exception) -> Optional[str]:
+    """Return 'overloaded', 'rate_limit', or None (non-retryable)."""
+    s = str(exc).lower()
+    if any(k in s for k in ("503", "service unavailable", "unavailable", "overloaded")):
+        return "overloaded"
+    if any(k in s for k in ("429", "resource_exhausted", "rate", "quota", "too many")):
+        return "rate_limit"
+    return None
 
 
 def _get_profile() -> str:
@@ -287,13 +306,21 @@ Return a JSON object with this exact structure:
   "talking_points": [<3-5 strings>]
 }}"""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-        ),
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            ),
+        )
+    except Exception as exc:
+        kind = _classify_gemini_exc(exc)
+        if kind == "overloaded":
+            raise GeminiOverloadedError("Gemini is experiencing high demand.") from exc
+        if kind == "rate_limit":
+            raise GeminiRateLimitError("Rate limit reached.") from exc
+        raise
 
     result = json.loads(response.text)
 

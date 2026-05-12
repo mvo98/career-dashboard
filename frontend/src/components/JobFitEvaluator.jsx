@@ -1,9 +1,25 @@
 import React, { useState } from 'react'
 import FitResult from './FitResult'
+import { apiFetch } from '../api'
+
+const RETRY_DELAYS = [2000, 4000, 8000]
+const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 function extractCompFromJD(jd) {
   const m = jd.match(/^Salary:\s*(.+)$/m)
   return m ? m[1].trim() : ''
+}
+
+function friendlyError(status, detail) {
+  if (status === 503) {
+    return 'Gemini is still experiencing high demand after 3 retries. Please try again in a moment.'
+  }
+  if (status === 429) {
+    return 'Rate limit still active after 3 retries. Please wait a minute before trying again.'
+  }
+  const msg = typeof detail === 'string' ? detail : JSON.stringify(detail)
+  const brief = msg.split('\n')[0].split('. ')[0].slice(0, 120)
+  return `Evaluation failed: ${brief}. Please try again.`
 }
 
 export default function JobFitEvaluator({
@@ -24,7 +40,9 @@ export default function JobFitEvaluator({
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [saveStatus, setSaveStatus] = useState(null) // null | 'saving' | 'saved' | 'error'
+  const [saveStatus, setSaveStatus] = useState(null)
+  // null | { attempt: 1|2|3, type: 'overloaded'|'rate_limit' }
+  const [retryState, setRetryState] = useState(null)
 
   async function handleEvaluate() {
     if (!jobDescription.trim()) return
@@ -32,25 +50,46 @@ export default function JobFitEvaluator({
     setError(null)
     setResult(null)
     setSaveStatus(null)
+    setRetryState(null)
 
-    try {
-      const res = await fetch('/api/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_description: jobDescription }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Evaluation failed')
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const res = await apiFetch('/api/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_description: jobDescription }),
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setRetryState(null)
+          setResult(data)
+          setLoading(false)
+          autoSave(data)
+          return
+        }
+
+        const errData = await res.json().catch(() => ({}))
+        const status = res.status
+
+        if ((status === 503 || status === 429) && attempt < 3) {
+          const type = status === 503 ? 'overloaded' : 'rate_limit'
+          setRetryState({ attempt: attempt + 1, type })
+          await sleep(RETRY_DELAYS[attempt])
+          setRetryState(null)
+          continue
+        }
+
+        setError(friendlyError(status, errData.detail))
+        break
+      } catch (err) {
+        setError(`Evaluation failed: ${err.message}. Please try again.`)
+        break
       }
-      const data = await res.json()
-      setResult(data)
-      autoSave(data)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
     }
+
+    setLoading(false)
+    setRetryState(null)
   }
 
   async function autoSave(evalResult) {
@@ -60,7 +99,7 @@ export default function JobFitEvaluator({
       ? manualComp
       : (evalResult.extracted_comp || apiSalary || '')
     try {
-      const res = await fetch('/api/airtable/save', {
+      const res = await apiFetch('/api/airtable/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,6 +216,16 @@ export default function JobFitEvaluator({
           {saveStatus === 'error'  && <span className="save-status save-error">Save failed</span>}
         </div>
       </div>
+
+      {retryState && (
+        <div className="retry-status-box">
+          <span className="spinner" style={{ borderColor: 'rgba(217,119,6,0.25)', borderTopColor: '#d97706' }} />
+          {retryState.type === 'overloaded'
+            ? `Gemini is experiencing high demand. Retrying automatically… (attempt ${retryState.attempt} of 3)`
+            : `Rate limit reached. Waiting before retrying… (attempt ${retryState.attempt} of 3)`
+          }
+        </div>
+      )}
 
       {error && <div className="error-message">{error}</div>}
       {result && <FitResult result={result} apiSalary={extractCompFromJD(jobDescription)} />}
