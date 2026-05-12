@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from models.materials import MaterialsRequest, MaterialsResponse
 from services.airtable import fetch_role_data, save_materials_generated
 from services.materials import generate_materials
+from services.gemini import GeminiOverloadedError, GeminiRateLimitError
 
 router = APIRouter()
 
@@ -33,6 +34,10 @@ async def generate(req: MaterialsRequest):
             full_jd=role_data["full_jd"],
             evaluation=role_data,
         )
+    except GeminiOverloadedError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except GeminiRateLimitError as e:
+        raise HTTPException(status_code=429, detail=str(e))
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
@@ -41,6 +46,6 @@ async def generate(req: MaterialsRequest):
     try:
         await save_materials_generated(req.company, req.role)
     except Exception:
-        pass  # non-critical — don't fail the whole request over the save
+        pass  # non-critical
 
     return MaterialsResponse(**result)

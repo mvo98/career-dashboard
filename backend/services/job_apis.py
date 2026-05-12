@@ -10,7 +10,7 @@ from models.job_search import JobResult, FilterReason
 
 ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs/us/search"
 REMOTIVE_BASE = "https://remotive.com/api/remote-jobs"
-JOBICY_BASE = "https://jobicy.com/api/v2/remote-jobs"
+REMOTEOK_BASE = "https://remoteok.com/api"
 SALARY_CEILING_SKIP = 80_000
 HOURLY_ANNUAL_THRESHOLD = 100_000
 
@@ -295,15 +295,59 @@ async def _search_remotive(
     return results
 
 
-async def _search_jobicy(
+_REMOTEOK_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+
+_REMOTEOK_TAG_MAP: list[tuple[list[str], str]] = [
+    (["engineer", "technical", "developer", "dev", "implementation", "integration", "solutions"],  "engineer"),
+    (["manager", "account", "tam", "director"],                                                     "manager"),
+    (["sales", "presales", "pre-sales"],                                                            "sales"),
+    (["success", "csm"],                                                                            "success"),
+    (["support", "helpdesk", "help-desk"],                                                          "support"),
+    (["analyst", "analysis", "biz ops", "bizops"],                                                  "analyst"),
+]
+
+def _title_to_remoteok_tag(title: str) -> str:
+    t = title.lower()
+    for keywords, tag in _REMOTEOK_TAG_MAP:
+        if any(kw in t for kw in keywords):
+            return tag
+    return "engineer"
+
+
+_GENERIC_TITLE_WORDS = {
+    "engineer", "engineering", "manager", "management", "director",
+    "specialist", "senior", "lead", "junior", "associate", "staff",
+    "principal", "software", "technical", "tech", "and", "or", "the",
+}
+
+def _position_matches_title(position: str, search_title: str) -> bool:
+    """Return True if the RemoteOK position is relevant to the searched title.
+
+    Uses only the discriminating words (strips generic role suffixes) to avoid
+    matching every 'Software Engineer' role when searching 'Solutions Engineer'.
+    """
+    all_words = re.findall(r"[a-z]+", search_title.lower())
+    anchor_words = [w for w in all_words if w not in _GENERIC_TITLE_WORDS and len(w) > 2]
+    # If nothing left after stripping, fall back to all words
+    words = anchor_words or [w for w in all_words if len(w) > 2]
+    pos = position.lower()
+    return any(w in pos for w in words)
+
+
+async def _search_remoteok(
     client: httpx.AsyncClient,
     title: str,
 ) -> list[JobResult]:
+    tag = _title_to_remoteok_tag(title)
     try:
         resp = await client.get(
-            JOBICY_BASE,
-            params={"tag": title, "count": 15},
-            timeout=12,
+            REMOTEOK_BASE,
+            params={"tags": tag},
+            headers={"User-Agent": _REMOTEOK_UA},
+            timeout=15,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -311,41 +355,34 @@ async def _search_jobicy(
         return []
 
     results = []
-    for item in data.get("jobs", []):
-        raw_desc = _strip_html(item.get("jobDescription", ""))
-        salary_min = item.get("annualSalaryMin") or None
-        salary_max = item.get("annualSalaryMax") or None
-        currency = item.get("salaryCurrency", "USD")
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        position = html_lib.unescape(item.get("position", ""))
+        if not position or not _position_matches_title(position, title):
+            continue
 
-        if salary_min:
-            salary_min = int(salary_min)
-        if salary_max:
-            salary_max = int(salary_max)
+        salary_min = int(item.get("salary_min") or 0) or None
+        salary_max = int(item.get("salary_max") or 0) or None
+        if salary_max and salary_max < SALARY_CEILING_SKIP:
+            continue
 
-        if currency == "USD":
-            if salary_max and salary_max < SALARY_CEILING_SKIP:
-                continue
-
-        sal_display = (
-            _format_salary(salary_min, salary_max)
-            if (salary_min or salary_max)
-            else (item.get("salary") or "Not listed")
-        )
-
-        job_id = hashlib.md5(f"jobicy:{item.get('id', '')}".encode()).hexdigest()[:12]
+        raw_desc = _strip_html(html_lib.unescape(item.get("description", "")))
+        job_id = hashlib.md5(f"remoteok:{item.get('id', '')}".encode()).hexdigest()[:12]
+        url = item.get("url") or item.get("apply_url") or ""
         results.append(JobResult(
             id=job_id,
-            title=item.get("jobTitle", ""),
-            company=item.get("companyName", "Unknown"),
+            title=position,
+            company=html_lib.unescape(item.get("company", "Unknown")),
             salary_min=salary_min,
             salary_max=salary_max,
-            salary_display=sal_display,
-            location=item.get("jobGeo", "Remote"),
+            salary_display=_format_salary(salary_min, salary_max),
+            location=item.get("location", "") or "Remote",
             description=raw_desc,
-            url=item.get("url", ""),
-            source="Jobicy",
+            url=url,
+            source="RemoteOK",
             flags=[],
-            posted_at=item.get("pubDate", ""),
+            posted_at=item.get("date", ""),
         ))
     return results
 
@@ -390,7 +427,7 @@ async def search_jobs(
             for coro in (
                 _search_adzuna(client, title, location, salary_floor),
                 _search_remotive(client, title),
-                _search_jobicy(client, title),
+                _search_remoteok(client, title),
             )
         ]
         batches = await asyncio.gather(*tasks)

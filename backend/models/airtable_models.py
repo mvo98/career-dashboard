@@ -71,6 +71,7 @@ class UpdateRoleRequest(BaseModel):
     role: str
     status: Optional[str] = None
     notes: Optional[str] = None
+    date_applied: Optional[str] = None
 
 
 class UpdateRoleResponse(BaseModel):
