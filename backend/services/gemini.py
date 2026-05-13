@@ -191,7 +191,19 @@ Mild green flags (+2 each):
   SQL proficiency required
   Multiple database types mentioned
 
-### Step 3: Apply red flag penalties (subtract from running total, floor at 0):
+### Step 3: Apply location rule (evaluate before red flags):
+
+ONSITE LOCATION RULE — apply exactly one of these cases:
+  Case A — Onsite in San Diego or Santee CA: Treat identically to hybrid. No penalty. No bonus.
+    Applies when: JD says onsite/in-office AND city is San Diego or Santee (California).
+  Case B — Fully remote or remote-first: Apply the "Remote-first" strong green flag (+12) already listed above.
+  Case C — Hybrid (some remote, some in-office): No penalty, no bonus.
+  Case D — Onsite required, city is NOT San Diego or Santee, no remote option: Apply −20 penalty.
+    This reflects a real lifestyle and relocation cost. Even high-tier roles are significantly
+    less attractive when they require leaving San Diego.
+  Case E — Location not specified or unclear: No penalty, no bonus.
+
+### Step 4: Apply red flag penalties (subtract from running total, floor at 0):
 
 High caution (−10 each):
   Vague or no salary listed at an established company
@@ -290,7 +302,7 @@ Return a JSON object with this exact structure:
     "strategic_fit": {{
       "score": <integer 0-100>,
       "weight": 0.20,
-      "reason": "<state the tier assigned and WHY (internal vs external clients), list each flag applied>"
+      "reason": "<state the tier assigned and WHY (internal vs external clients), state which location case applied (A/B/C/D/E) and the penalty or bonus, list each other flag applied>"
     }},
     "domain_fit": {{
       "score": <integer 0-100>,

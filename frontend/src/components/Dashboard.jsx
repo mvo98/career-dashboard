@@ -9,6 +9,7 @@ const STATUS_STYLES = {
   Interviewing: { bg: '#ecfdf5', color: '#059669' },
   Offer:        { bg: '#fdf4ff', color: '#7c3aed' },
   Rejected:     { bg: '#fef2f2', color: '#dc2626' },
+  Passed:       { bg: '#f1f5f9', color: '#475569' },
   Explore:      { bg: '#fef3c7', color: '#b45309' },
   Evaluated:    { bg: '#faf5ff', color: '#7c3aed' },
   Saved:        { bg: '#f5f3ff', color: '#6d28d9' },
@@ -16,43 +17,47 @@ const STATUS_STYLES = {
   Unknown:      { bg: '#f9fafb', color: '#9ca3af' },
 }
 
-const STATUS_ORDER = ['Applied', 'Responded', 'Scheduled', 'Interviewing', 'Offer', 'Rejected', 'Explore', 'Evaluated', 'Saved', 'Skip']
+const STATUS_ORDER = ['Applied', 'Responded', 'Scheduled', 'Interviewing', 'Offer', 'Rejected', 'Passed', 'Explore', 'Evaluated', 'Saved', 'Skip']
 
 const STATUS_OPTIONS = [
   'Evaluated', 'Applied', 'Responded', 'Scheduled', 'Interviewing',
-  'Offer', 'Rejected', 'Saved', 'Explore', 'Skip', 'Dismissed',
+  'Offer', 'Rejected', 'Passed', 'Saved', 'Explore', 'Skip', 'Dismissed',
 ]
 
-const FILTER_OPTIONS = ['Pending', 'Applied', 'Responded', 'Scheduled', 'Interviewing', 'Explore', 'Rejected', 'All']
+const FILTER_OPTIONS = ['Pending', 'Applied', 'Responded', 'Scheduled', 'Interviewing', 'Explore', 'Rejected', 'Passed', 'All']
 
 // Context-aware actions per status
 const CONTEXT_ACTIONS = {
   Evaluated:    [
-    { type: 'apply',        label: 'Apply',         cls: 'applied'      },
-    { type: 'explore',      label: 'Explore',       cls: 'explore-act'  },
-    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+    { type: 'apply',          label: 'Apply',          cls: 'applied'        },
+    { type: 'explore',        label: 'Explore',        cls: 'explore-act'    },
+    { type: 'not_interested', label: 'Not Interested', cls: 'not-interested' },
+    { type: 'reject',         label: 'Reject',         cls: 'rejected'       },
   ],
   Applied:      [
-    { type: 'replied',      label: 'They Replied',  cls: 'replied'      },
-    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+    { type: 'replied',        label: 'They Replied',   cls: 'replied'        },
+    { type: 'not_interested', label: 'Not Interested', cls: 'not-interested' },
+    { type: 'reject',         label: 'Reject',         cls: 'rejected'       },
   ],
   Responded:    [
-    { type: 'scheduled',    label: 'Schedule Call', cls: 'scheduled'    },
-    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+    { type: 'scheduled',      label: 'Schedule Call',  cls: 'scheduled'      },
+    { type: 'reject',         label: 'Reject',         cls: 'rejected'       },
   ],
   Scheduled:    [
-    { type: 'interviewing', label: 'Interviewing',  cls: 'interviewing' },
-    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+    { type: 'interviewing',   label: 'Interviewing',   cls: 'interviewing'   },
+    { type: 'reject',         label: 'Reject',         cls: 'rejected'       },
   ],
   Interviewing: [
-    { type: 'offer',        label: 'Offer',         cls: 'offer'        },
-    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+    { type: 'offer',          label: 'Offer',          cls: 'offer'          },
+    { type: 'reject',         label: 'Reject',         cls: 'rejected'       },
   ],
   Explore:      [
-    { type: 'apply',        label: 'Apply',         cls: 'applied'      },
-    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+    { type: 'apply',          label: 'Apply',          cls: 'applied'        },
+    { type: 'not_interested', label: 'Not Interested', cls: 'not-interested' },
+    { type: 'reject',         label: 'Reject',         cls: 'rejected'       },
   ],
   Rejected:     [],
+  Passed:       [],
 }
 
 // Types that need an inline prompt before confirming
@@ -213,6 +218,10 @@ export default function Dashboard({ active }) {
       case 'interviewing':
         line = `${stamp} Moved to Interviewing`
         newStatus = 'Interviewing'
+        break
+      case 'not_interested':
+        line = `${stamp} Passed — Not interested`
+        newStatus = 'Passed'
         break
       default:
         return

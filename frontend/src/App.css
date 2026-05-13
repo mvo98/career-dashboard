@@ -1650,3 +1650,6 @@ body {
 .btn-quick.interviewing  { border-color: #6ee7b7; color: #059669; background: #ecfdf5; }
 .btn-quick.interviewing:hover { background: #d1fae5; border-color: #34d399; }
 .btn-quick.interviewing.btn-quick-open { background: #d1fae5; border-color: #34d399; }
+
+.btn-quick.not-interested { border-color: #cbd5e1; color: #475569; background: #f8fafc; }
+.btn-quick.not-interested:hover { background: #e2e8f0; border-color: #94a3b8; color: #334155; }

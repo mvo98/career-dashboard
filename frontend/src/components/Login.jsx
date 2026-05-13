@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { setToken } from '../api'
+import { setToken, API_URL } from '../api'
 
 export default function Login({ onSuccess }) {
   const [password, setPassword] = useState('')
@@ -11,7 +11,7 @@ export default function Login({ onSuccess }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/auth', {
+      const res = await fetch(`${API_URL}/api/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
