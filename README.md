@@ -4,11 +4,13 @@
 
 [**Live Demo →**](https://career-dashboard-nu.vercel.app)
 
+> Note: Live demo is password-protected (personal tool). Clone locally and add your own API keys to explore.
+
 ---
 
 ## What It Does
 
-The Career Intelligence Dashboard replaces manual job searching with an automated pipeline: it discovers roles across multiple job boards, scores each one against a custom 5-dimension AI rubric, generates tailored resume summaries and cover letters on demand, and tracks every application in Airtable. Built as a personal tool to bring engineering rigor to a job search — and as a showcase of full-stack AI application development.
+The Career Intelligence Dashboard replaces manual job searching with an automated pipeline: it discovers roles across multiple job boards, scores each one against a custom 5-dimension AI rubric, generates tailored resume summaries and cover letters on demand, and tracks every application in Airtable. Built to automate my own job search — and as a practical demonstration of full-stack AI integration from API design through production deployment.
 
 ---
 
