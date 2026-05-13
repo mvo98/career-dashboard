@@ -1,13 +1,26 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import JobFitEvaluator from './components/JobFitEvaluator'
 import RoleDiscovery from './components/RoleDiscovery'
 import Dashboard from './components/Dashboard'
+import Login from './components/Login'
+import { getToken } from './api'
 
 export default function App() {
+  const [authed, setAuthed] = useState(() => !!getToken())
   const [activeTab, setActiveTab] = useState('discovery')
   const [evaluatorKey, setEvaluatorKey] = useState(0)
   const [evalInit, setEvalInit] = useState({ jd: '', company: '', role: '', url: '', source: '', jobId: '', jdIncomplete: false })
   const [savedJobIds, setSavedJobIds] = useState(new Set())
+
+  useEffect(() => {
+    const onLogout = () => setAuthed(false)
+    window.addEventListener('auth:logout', onLogout)
+    return () => window.removeEventListener('auth:logout', onLogout)
+  }, [])
+
+  if (!authed) {
+    return <Login onSuccess={() => setAuthed(true)} />
+  }
 
   function handleEvaluateJob({ jd, company = '', role = '', url = '', source = '', jobId = '', jdIncomplete = false }) {
     setEvalInit({ jd, company, role, url, source, jobId, jdIncomplete })
