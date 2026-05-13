@@ -3,17 +3,17 @@ import MaterialsModal from './MaterialsModal'
 import { apiFetch } from '../api'
 
 const STATUS_STYLES = {
-  Applied:     { bg: '#eff6ff', color: '#2563eb' },
-  Responded:   { bg: '#f0fdf4', color: '#16a34a' },
-  Scheduled:   { bg: '#f0fdfa', color: '#0d9488' },
-  Interviewing:{ bg: '#ecfdf5', color: '#059669' },
-  Offer:       { bg: '#fdf4ff', color: '#7c3aed' },
-  Rejected:    { bg: '#fef2f2', color: '#dc2626' },
-  Explore:     { bg: '#fef3c7', color: '#b45309' },
-  Evaluated:   { bg: '#faf5ff', color: '#7c3aed' },
-  Saved:       { bg: '#f5f3ff', color: '#6d28d9' },
-  Skip:        { bg: '#f9fafb', color: '#6b7280' },
-  Unknown:     { bg: '#f9fafb', color: '#9ca3af' },
+  Applied:      { bg: '#eff6ff', color: '#2563eb' },
+  Responded:    { bg: '#f0fdf4', color: '#16a34a' },
+  Scheduled:    { bg: '#f0fdfa', color: '#0d9488' },
+  Interviewing: { bg: '#ecfdf5', color: '#059669' },
+  Offer:        { bg: '#fdf4ff', color: '#7c3aed' },
+  Rejected:     { bg: '#fef2f2', color: '#dc2626' },
+  Explore:      { bg: '#fef3c7', color: '#b45309' },
+  Evaluated:    { bg: '#faf5ff', color: '#7c3aed' },
+  Saved:        { bg: '#f5f3ff', color: '#6d28d9' },
+  Skip:         { bg: '#f9fafb', color: '#6b7280' },
+  Unknown:      { bg: '#f9fafb', color: '#9ca3af' },
 }
 
 const STATUS_ORDER = ['Applied', 'Responded', 'Scheduled', 'Interviewing', 'Offer', 'Rejected', 'Explore', 'Evaluated', 'Saved', 'Skip']
@@ -23,8 +23,40 @@ const STATUS_OPTIONS = [
   'Offer', 'Rejected', 'Saved', 'Explore', 'Skip', 'Dismissed',
 ]
 
-const FILTER_OPTIONS = ['Applied', 'Responded', 'Scheduled', 'Interviewing', 'Rejected', 'Explore']
-const PENDING_STATUSES = ['Evaluated', 'Explore']
+const FILTER_OPTIONS = ['Pending', 'Applied', 'Responded', 'Scheduled', 'Interviewing', 'Explore', 'Rejected', 'All']
+
+// Context-aware actions per status
+const CONTEXT_ACTIONS = {
+  Evaluated:    [
+    { type: 'apply',        label: 'Apply',         cls: 'applied'      },
+    { type: 'explore',      label: 'Explore',       cls: 'explore-act'  },
+    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+  ],
+  Applied:      [
+    { type: 'replied',      label: 'They Replied',  cls: 'replied'      },
+    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+  ],
+  Responded:    [
+    { type: 'scheduled',    label: 'Schedule Call', cls: 'scheduled'    },
+    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+  ],
+  Scheduled:    [
+    { type: 'interviewing', label: 'Interviewing',  cls: 'interviewing' },
+    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+  ],
+  Interviewing: [
+    { type: 'offer',        label: 'Offer',         cls: 'offer'        },
+    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+  ],
+  Explore:      [
+    { type: 'apply',        label: 'Apply',         cls: 'applied'      },
+    { type: 'reject',       label: 'Reject',        cls: 'rejected'     },
+  ],
+  Rejected:     [],
+}
+
+// Types that need an inline prompt before confirming
+const PROMPT_TYPES = new Set(['reject', 'scheduled', 'offer'])
 
 const ACTION_COLORS = {
   Apply:   '#16a34a',
@@ -51,6 +83,12 @@ function isoToday() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function matchesFilter(effectiveStatus, filter) {
+  if (filter === 'All') return true
+  if (filter === 'Pending') return effectiveStatus === 'Evaluated'
+  return effectiveStatus === filter
+}
+
 function StatCard({ label, value, sub }) {
   return (
     <div className="stat-card">
@@ -74,16 +112,9 @@ export default function Dashboard({ active }) {
   const [rolesError, setRolesError] = useState(null)
   const [activeModal, setActiveModal] = useState(null)
 
-  // Per-row local state: status and notes
   const [rowEdits, setRowEdits] = useState({})
-
-  // Filter state: [] = All, otherwise array of status strings
-  const [activeFilters, setActiveFilters] = useState(PENDING_STATUSES)
-
-  // Single active inline prompt: { key, type, note, extra }
+  const [activeFilter, setActiveFilter] = useState('Pending')
   const [activePrompt, setActivePrompt] = useState(null)
-
-  // Per-row "Add note" input values
   const [newNoteInputs, setNewNoteInputs] = useState({})
 
   function getRowEdit(r) {
@@ -152,18 +183,56 @@ export default function Dashboard({ active }) {
     }
   }
 
-  function toggleFilter(f) {
-    setActiveFilters(prev => {
-      if (prev.length === 0) return [f]
-      if (prev.includes(f)) return prev.filter(x => x !== f)
-      return [...prev, f]
-    })
-  }
-
   function openPrompt(k, type) {
     setActivePrompt(prev =>
       prev?.key === k && prev?.type === type ? null : { key: k, type, note: '', extra: '' }
     )
+  }
+
+  async function handleDirectAction(r, type) {
+    const k = rowKey(r)
+    const stamp = fmtStamp()
+    let line = ''
+    let newStatus = ''
+    let extraFields = {}
+
+    switch (type) {
+      case 'apply':
+        line = `${stamp} Marked as Applied`
+        newStatus = 'Applied'
+        extraFields = { date_applied: isoToday() }
+        break
+      case 'explore':
+        line = `${stamp} Moved to Explore`
+        newStatus = 'Explore'
+        break
+      case 'replied':
+        line = `${stamp} They replied`
+        newStatus = 'Responded'
+        break
+      case 'interviewing':
+        line = `${stamp} Moved to Interviewing`
+        newStatus = 'Interviewing'
+        break
+      default:
+        return
+    }
+
+    const currentNotes = (rowEdits[k]?.notes) ?? (r.notes || '')
+    const newNotes = currentNotes ? `${currentNotes}\n${line}` : line
+
+    applyRowEdit(k, { status: newStatus, notes: newNotes })
+    setActivePrompt(null)
+
+    try {
+      await apiFetch('/api/airtable/role', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: r.company, role: r.role, status: newStatus, notes: newNotes, ...extraFields }),
+      })
+    } catch {
+      // best-effort
+    }
   }
 
   async function handleQuickAction(r) {
@@ -174,14 +243,12 @@ export default function Dashboard({ active }) {
 
     let line = ''
     let newStatus = ''
+    let extraFields = {}
+
     switch (type) {
-      case 'rejected':
+      case 'reject':
         line = `${stamp} Rejected${note ? ` — ${note}` : ''}`
         newStatus = 'Rejected'
-        break
-      case 'replied':
-        line = `${stamp} They replied${note ? ` — ${note}` : ''}`
-        newStatus = 'Responded'
         break
       case 'scheduled':
         line = `${stamp} Call scheduled${extra ? ` ${extra}` : ''}${note ? ` — ${note}` : ''}`
@@ -205,35 +272,7 @@ export default function Dashboard({ active }) {
       await apiFetch('/api/airtable/role', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: r.company, role: r.role, status: newStatus, notes: newNotes }),
-      })
-    } catch {
-      // best-effort
-    }
-  }
-
-  async function handleMarkApplied(r) {
-    const k = rowKey(r)
-    const stamp = fmtStamp()
-    const today = isoToday()
-    const line = `${stamp} Marked as Applied`
-    const currentNotes = (rowEdits[k]?.notes) ?? (r.notes || '')
-    const newNotes = currentNotes ? `${currentNotes}\n${line}` : line
-
-    applyRowEdit(k, { status: 'Applied', notes: newNotes })
-    setActivePrompt(null)
-
-    try {
-      await apiFetch('/api/airtable/role', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company: r.company,
-          role: r.role,
-          status: 'Applied',
-          notes: newNotes,
-          date_applied: today,
-        }),
+        body: JSON.stringify({ company: r.company, role: r.role, status: newStatus, notes: newNotes, ...extraFields }),
       })
     } catch {
       // best-effort
@@ -268,14 +307,11 @@ export default function Dashboard({ active }) {
     ...Object.keys(byStatus).filter(s => !STATUS_ORDER.includes(s)),
   ]
 
-  // Use effective status from rowEdits for filtering
   const filteredRoles = roles
-    ? (activeFilters.length === 0
-        ? roles
-        : roles.filter(r => {
-            const effectiveStatus = rowEdits[rowKey(r)]?.status ?? r.status ?? ''
-            return activeFilters.includes(effectiveStatus)
-          }))
+    ? roles.filter(r => {
+        const effectiveStatus = rowEdits[rowKey(r)]?.status ?? r.status ?? ''
+        return matchesFilter(effectiveStatus, activeFilter)
+      })
     : []
 
   return (
@@ -318,37 +354,6 @@ export default function Dashboard({ active }) {
               })}
             </div>
           </section>
-
-          {data.follow_up_needed.length > 0 && (
-            <section className="dash-section">
-              <h3 className="dash-section-title">Needs Follow-Up</h3>
-              <div className="followup-list">
-                {data.follow_up_needed.map((r, i) => (
-                  <div key={i} className="followup-row">
-                    <div className="followup-info">
-                      <span className="followup-company">{r.company}</span>
-                      <span className="followup-role">{r.role}</span>
-                    </div>
-                    <div className="followup-meta">
-                      {r.fit_score != null && (
-                        <span className="followup-fit">Fit {r.fit_score}</span>
-                      )}
-                      <span className="followup-date">Applied {r.date_applied}</span>
-                      {r.posting_url && (
-                        <a href={r.posting_url} target="_blank" rel="noreferrer" className="followup-apply-link">
-                          Apply →
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {data.follow_up_needed.length === 0 && !loading && (
-            <p className="dash-empty">No follow-ups needed yet — all Applied roles are within 7 days.</p>
-          )}
         </>
       )}
 
@@ -372,32 +377,16 @@ export default function Dashboard({ active }) {
         {roles && roles.length > 0 && (
           <>
             <div className="roles-filter-bar">
-              <button
-                className={`filter-pill${activeFilters.length === 0 ? ' filter-pill-active' : ''}`}
-                onClick={() => setActiveFilters([])}
-              >
-                All
-              </button>
-              <button
-                className={`filter-pill${PENDING_STATUSES.every(s => activeFilters.includes(s)) && activeFilters.length === PENDING_STATUSES.length ? ' filter-pill-active' : ''}`}
-                onClick={() => setActiveFilters(
-                  PENDING_STATUSES.every(s => activeFilters.includes(s)) && activeFilters.length === PENDING_STATUSES.length
-                    ? []
-                    : PENDING_STATUSES
-                )}
-              >
-                Pending
-              </button>
               {FILTER_OPTIONS.map(f => (
                 <button
                   key={f}
-                  className={`filter-pill${activeFilters.includes(f) ? ' filter-pill-active' : ''}`}
-                  onClick={() => toggleFilter(f)}
+                  className={`filter-pill${activeFilter === f ? ' filter-pill-active' : ''}`}
+                  onClick={() => setActiveFilter(f)}
                 >
                   {f}
                 </button>
               ))}
-              {activeFilters.length > 0 && (
+              {activeFilter !== 'All' && (
                 <span className="roles-filter-count">{filteredRoles.length} of {roles.length}</span>
               )}
             </div>
@@ -410,6 +399,7 @@ export default function Dashboard({ active }) {
                   const edit = getRowEdit(r)
                   const k = rowKey(r)
                   const promptActive = activePrompt?.key === k
+                  const contextActions = CONTEXT_ACTIONS[edit.status] || []
 
                   return (
                     <div key={k} className="role-row">
@@ -453,29 +443,23 @@ export default function Dashboard({ active }) {
                         </div>
                       </div>
 
-                      {/* Quick action buttons */}
-                      <div className="role-quick-actions">
-                        <button
-                          className="btn-quick applied"
-                          onClick={() => handleMarkApplied(r)}
-                        >
-                          Mark Applied
-                        </button>
-                        {[
-                          { type: 'rejected',  label: 'Rejected',      cls: 'rejected'  },
-                          { type: 'replied',   label: 'They Replied',  cls: 'replied'   },
-                          { type: 'scheduled', label: 'Call Scheduled',cls: 'scheduled' },
-                          { type: 'offer',     label: 'Offer',         cls: 'offer'     },
-                        ].map(({ type, label, cls }) => (
-                          <button
-                            key={type}
-                            className={`btn-quick ${cls}${promptActive && activePrompt.type === type ? ' btn-quick-open' : ''}`}
-                            onClick={() => openPrompt(k, type)}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+                      {/* Context-aware action buttons */}
+                      {contextActions.length > 0 && (
+                        <div className="role-quick-actions">
+                          {contextActions.map(({ type, label, cls }) => (
+                            <button
+                              key={type}
+                              className={`btn-quick ${cls}${promptActive && activePrompt?.type === type ? ' btn-quick-open' : ''}`}
+                              onClick={() => {
+                                if (PROMPT_TYPES.has(type)) openPrompt(k, type)
+                                else handleDirectAction(r, type)
+                              }}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Inline prompt */}
                       {promptActive && (
@@ -495,11 +479,11 @@ export default function Dashboard({ active }) {
                           )}
                           <input
                             className="inline-prompt-input"
-                            placeholder="Optional note…"
+                            placeholder={activePrompt.type === 'reject' ? 'Reason (optional)…' : 'Optional note…'}
                             value={activePrompt.note}
                             onChange={e => setActivePrompt(p => ({ ...p, note: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') handleQuickAction(r) }}
-                            autoFocus={activePrompt.type !== 'scheduled' && activePrompt.type !== 'offer'}
+                            autoFocus={activePrompt.type === 'reject'}
                           />
                           <div className="inline-prompt-actions">
                             <button className="btn-prompt-confirm" onClick={() => handleQuickAction(r)}>Confirm</button>

@@ -1,9 +1,28 @@
-const SECRET = import.meta.env.VITE_APP_SECRET || ''
+const TOKEN_KEY = 'auth_token'
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function removeToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
 
 export function apiFetch(url, options = {}) {
+  const token = getToken()
   const headers = {
-    'x-api-key': SECRET,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   }
-  return fetch(url, { ...options, headers })
+  return fetch(url, { ...options, headers }).then(res => {
+    if (res.status === 401) {
+      removeToken()
+      window.dispatchEvent(new Event('auth:logout'))
+    }
+    return res
+  })
 }

@@ -1560,3 +1560,93 @@ body {
 }
 
 .btn-add-note:hover { border-color: var(--primary); color: var(--primary); }
+
+/* ── Login screen ────────────────────────────────────────────── */
+
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 24px;
+}
+
+.login-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.login-sub {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-input {
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.login-input:focus {
+  border-color: var(--primary);
+  background: #fff;
+}
+
+.login-error {
+  font-size: 0.85rem;
+  color: #dc2626;
+}
+
+.login-btn {
+  padding: 10px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  margin-top: 4px;
+}
+
+.login-btn:hover:not(:disabled) { background: var(--primary-hover); }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Explore / Interviewing action buttons ───────────────────── */
+
+.btn-quick.explore-act   { border-color: #fde68a; color: #b45309; background: #fffbeb; }
+.btn-quick.explore-act:hover { background: #fef3c7; border-color: #fbbf24; }
+.btn-quick.explore-act.btn-quick-open { background: #fef3c7; border-color: #fbbf24; }
+
+.btn-quick.interviewing  { border-color: #6ee7b7; color: #059669; background: #ecfdf5; }
+.btn-quick.interviewing:hover { background: #d1fae5; border-color: #34d399; }
+.btn-quick.interviewing.btn-quick-open { background: #d1fae5; border-color: #34d399; }
