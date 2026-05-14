@@ -96,11 +96,11 @@ async def backfill():
                 updated_fields: dict = {}
                 updated: list = []
 
-                # Fix 1: early rows where Action="Explore" was used as a status marker
+                # Fix 1: rows where Action="Explore"/"Skip" was stored instead of Status
                 if rec.get("migrate_explore"):
-                    updated_fields["Status"] = "Explore"
-                    updated_fields["Action"] = ""  # clear the misused column
-                    updated.append("Status←Explore")
+                    updated_fields["Status"] = rec["action"]  # "Explore" or "Skip"
+                    updated_fields["Action"] = ""             # clear the misused column
+                    updated.append(f"Status←{rec['action']}")
 
                 # Fix 2: ghost rows with no status and no fit score
                 if rec.get("set_evaluated") and "Status" not in updated_fields:

@@ -379,8 +379,8 @@ async def find_incomplete_records() -> list[dict]:
 
         issues: dict = {}
 
-        # Migrate Action="Explore" → Status when Status is empty or still "Evaluated"
-        if action.lower() == "explore" and status in ("", "Evaluated"):
+        # Migrate Action="Explore"/"Skip" → Status when Status is empty or still "Evaluated"
+        if action.lower() in ("explore", "skip") and status in ("", "Evaluated"):
             issues["migrate_explore"] = True
 
         # Ghost rows: no status, no fit score, but have a Full JD — set to Evaluated
