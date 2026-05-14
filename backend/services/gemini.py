@@ -27,7 +27,14 @@ def _classify_gemini_exc(exc: Exception) -> Optional[str]:
 
 
 def _get_profile() -> str:
-    return _PROFILE_PATH.read_text()
+    if _PROFILE_PATH.exists():
+        return _PROFILE_PATH.read_text()
+    content = os.environ.get("PROFILE_CONTENT")
+    if content:
+        return content
+    raise FileNotFoundError(
+        "profile.md not found and PROFILE_CONTENT environment variable is not set."
+    )
 
 
 def evaluate_job_fit(job_description: str) -> dict:

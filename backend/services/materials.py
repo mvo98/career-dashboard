@@ -10,16 +10,25 @@ _WRITING_GUIDE_PATH = Path(__file__).parent.parent.parent / "writing_guide.md"
 
 
 def _get_profile() -> str:
-    return _PROFILE_PATH.read_text()
+    if _PROFILE_PATH.exists():
+        return _PROFILE_PATH.read_text()
+    content = os.environ.get("PROFILE_CONTENT")
+    if content:
+        return content
+    raise FileNotFoundError(
+        "profile.md not found and PROFILE_CONTENT environment variable is not set."
+    )
 
 
 def _get_writing_guide() -> str:
-    if not _WRITING_GUIDE_PATH.exists():
-        raise FileNotFoundError(
-            "writing_guide.md not found at repo root. "
-            "Create it with your resume formula, cover letter structure, signal mapping table, and voice guide."
-        )
-    return _WRITING_GUIDE_PATH.read_text()
+    if _WRITING_GUIDE_PATH.exists():
+        return _WRITING_GUIDE_PATH.read_text()
+    content = os.environ.get("WRITING_GUIDE_CONTENT")
+    if content:
+        return content
+    raise FileNotFoundError(
+        "writing_guide.md not found and WRITING_GUIDE_CONTENT environment variable is not set."
+    )
 
 
 def generate_materials(
