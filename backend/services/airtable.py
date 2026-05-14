@@ -119,13 +119,16 @@ async def save_evaluation(
     async with httpx.AsyncClient(timeout=20) as client:
         await _ensure_eval_fields(client)
 
+        # Explore/Skip already have their verdict; Apply still needs a pipeline decision
+        pipeline_status = action if action in ("Explore", "Skip") else "Evaluated"
+
         fields: dict[str, Any] = {
             "Fit":            fit_score,
             "Action":         action,
             "Rationale":      rationale,
             "Full JD":        full_jd[:99_000],
             "Date Evaluated": str(date.today()),
-            "Status":         "Evaluated",
+            "Status":         pipeline_status,
         }
         if company:
             fields["Company"] = company
@@ -276,12 +279,10 @@ async def get_roles_list() -> list[dict]:
         if not company or not role:
             continue
         fit = f.get("Fit")
-        if fit is None:
-            continue
         roles.append({
             "company":             company,
             "role":                role,
-            "fit_score":           int(fit),
+            "fit_score":           int(fit) if fit is not None else None,
             "status":              _canonical_status(f.get("Status")),
             "action":              f.get("Action"),
             "date_evaluated":      f.get("Date Evaluated"),
@@ -358,35 +359,57 @@ async def lookup_roles(roles: list[dict]) -> dict:
 
 
 async def find_incomplete_records() -> list[dict]:
-    """Return records that have Full JD but are missing Company, Role, or Comp."""
+    """Return records that need any backfill fix."""
     async with httpx.AsyncClient(timeout=30) as client:
         records = await _fetch_all_records(
-            client, ["Company", "Role", "Comp", "Full JD", "Source"]
+            client, ["Company", "Role", "Comp", "Full JD", "Source", "Status", "Action", "Fit"]
         )
 
     incomplete = []
     for rec in records:
         f = rec.get("fields", {})
-        full_jd = f.get("Full JD", "")
-        if not full_jd:
+        full_jd  = f.get("Full JD", "") or ""
+        company  = f.get("Company", "") or ""
+        role     = f.get("Role", "") or ""
+        comp     = f.get("Comp", "") or ""
+        source   = f.get("Source", "") or ""
+        status   = _canonical_status(f.get("Status")) or ""
+        action   = f.get("Action", "") or ""
+        fit      = f.get("Fit")
+
+        issues: dict = {}
+
+        # Migrate Action="Explore" → Status when Status is empty or still "Evaluated"
+        if action.lower() == "explore" and status in ("", "Evaluated"):
+            issues["migrate_explore"] = True
+
+        # Ghost rows: no status, no fit score, but have a Full JD — set to Evaluated
+        if not status and full_jd and fit is None:
+            issues["set_evaluated"] = True
+
+        # Missing metadata fields that can be extracted from the JD
+        if full_jd:
+            missing = [
+                field for field, val in [("Company", company), ("Role", role), ("Comp", comp)]
+                if not val
+            ]
+            if missing:
+                issues["missing"] = missing
+
+        if not issues:
             continue
-        company = f.get("Company", "")
-        role = f.get("Role", "")
-        comp = f.get("Comp", "")
-        missing = [
-            field for field, val in [("Company", company), ("Role", role), ("Comp", comp)]
-            if not val
-        ]
-        if missing:
-            incomplete.append({
-                "record_id": rec["id"],
-                "company": company,
-                "role": role,
-                "comp": comp,
-                "full_jd": full_jd,
-                "missing": missing,
-                "source": f.get("Source", ""),
-            })
+
+        incomplete.append({
+            "record_id": rec["id"],
+            "company":   company,
+            "role":      role,
+            "comp":      comp,
+            "full_jd":   full_jd,
+            "source":    source,
+            "status":    status,
+            "action":    action,
+            **issues,
+        })
 
     return incomplete
 

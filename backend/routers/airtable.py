@@ -93,19 +93,33 @@ async def backfill():
         done = 0
         for rec in records:
             try:
-                extracted = await asyncio.to_thread(extract_jd_metadata, rec["full_jd"])
                 updated_fields: dict = {}
                 updated: list = []
 
-                if "Company" in rec["missing"] and extracted.get("company"):
-                    updated_fields["Company"] = extracted["company"]
-                    updated.append("Company")
-                if "Role" in rec["missing"] and extracted.get("role"):
-                    updated_fields["Role"] = extracted["role"]
-                    updated.append("Role")
-                if "Comp" in rec["missing"] and extracted.get("comp"):
-                    updated_fields["Comp"] = extracted["comp"]
-                    updated.append("Comp")
+                # Fix 1: early rows where Action="Explore" was used as a status marker
+                if rec.get("migrate_explore"):
+                    updated_fields["Status"] = "Explore"
+                    updated_fields["Action"] = ""  # clear the misused column
+                    updated.append("Status←Explore")
+
+                # Fix 2: ghost rows with no status and no fit score
+                if rec.get("set_evaluated") and "Status" not in updated_fields:
+                    updated_fields["Status"] = "Evaluated"
+                    updated.append("Status=Evaluated")
+
+                # Fix 3: extract missing Company/Role/Comp from the JD
+                if rec.get("missing") and rec.get("full_jd"):
+                    extracted = await asyncio.to_thread(extract_jd_metadata, rec["full_jd"])
+                    if "Company" in rec["missing"] and extracted.get("company"):
+                        updated_fields["Company"] = extracted["company"]
+                        updated.append("Company")
+                    if "Role" in rec["missing"] and extracted.get("role"):
+                        updated_fields["Role"] = extracted["role"]
+                        updated.append("Role")
+                    if "Comp" in rec["missing"] and extracted.get("comp"):
+                        updated_fields["Comp"] = extracted["comp"]
+                        updated.append("Comp")
+
                 if not rec.get("source"):
                     updated_fields["Source"] = "Manual"
 
