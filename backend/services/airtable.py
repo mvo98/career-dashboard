@@ -346,6 +346,51 @@ async def lookup_roles(roles: list[dict]) -> dict:
     return {"matches": matches}
 
 
+async def find_incomplete_records() -> list[dict]:
+    """Return records that have Full JD but are missing Company, Role, or Comp."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        records = await _fetch_all_records(
+            client, ["Company", "Role", "Comp", "Full JD", "Source"]
+        )
+
+    incomplete = []
+    for rec in records:
+        f = rec.get("fields", {})
+        full_jd = f.get("Full JD", "")
+        if not full_jd:
+            continue
+        company = f.get("Company", "")
+        role = f.get("Role", "")
+        comp = f.get("Comp", "")
+        missing = [
+            field for field, val in [("Company", company), ("Role", role), ("Comp", comp)]
+            if not val
+        ]
+        if missing:
+            incomplete.append({
+                "record_id": rec["id"],
+                "company": company,
+                "role": role,
+                "comp": comp,
+                "full_jd": full_jd,
+                "missing": missing,
+                "source": f.get("Source", ""),
+            })
+
+    return incomplete
+
+
+async def patch_record_by_id(record_id: str, fields: dict) -> None:
+    token, base, table = _cfg()
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.patch(
+            f"{_AT_BASE}/{base}/{table}/{record_id}",
+            headers=_h(token),
+            content=json.dumps({"fields": fields, "typecast": True}),
+        )
+        resp.raise_for_status()
+
+
 async def get_dashboard() -> dict:
     async with httpx.AsyncClient(timeout=20) as client:
         records = await _fetch_all_records(

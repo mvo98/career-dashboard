@@ -121,6 +121,7 @@ export default function Dashboard({ active }) {
   const [activeFilter, setActiveFilter] = useState('Pending')
   const [activePrompt, setActivePrompt] = useState(null)
   const [newNoteInputs, setNewNoteInputs] = useState({})
+  const [backfill, setBackfill] = useState(null)
 
   function getRowEdit(r) {
     const k = rowKey(r)
@@ -310,6 +311,47 @@ export default function Dashboard({ active }) {
     }
   }
 
+  async function handleBackfill() {
+    setBackfill({ running: true, done: 0, total: null, complete: false, error: null })
+    try {
+      const res = await apiFetch('/api/airtable/backfill', { method: 'POST' })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setBackfill({ running: false, done: 0, total: 0, complete: false, error: d.detail || 'Backfill failed' })
+        return
+      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+        for (const line of lines) {
+          if (!line.trim()) continue
+          try {
+            const msg = JSON.parse(line)
+            if (msg.type === 'total') {
+              if (msg.total === 0) {
+                setBackfill({ running: false, done: 0, total: 0, complete: true, error: null })
+              } else {
+                setBackfill(prev => ({ ...prev, total: msg.total }))
+              }
+            } else if (msg.type === 'progress') {
+              setBackfill(prev => ({ ...prev, done: msg.done, total: msg.total }))
+            } else if (msg.type === 'done') {
+              setBackfill({ running: false, done: msg.done, total: msg.total, complete: true, error: null })
+            }
+          } catch {}
+        }
+      }
+    } catch (err) {
+      setBackfill(prev => ({ ...prev, running: false, error: err.message }))
+    }
+  }
+
   const byStatus = data?.by_status || {}
   const orderedStatuses = [
     ...STATUS_ORDER.filter(s => byStatus[s]),
@@ -327,9 +369,30 @@ export default function Dashboard({ active }) {
     <div className="dashboard">
       <div className="dashboard-header">
         <h2 className="dashboard-title">Tracker Overview</h2>
-        <button className="btn-refresh" onClick={() => { load(); loadRoles() }} disabled={loading}>
-          {loading ? 'Loading…' : 'Refresh'}
-        </button>
+        <div className="dashboard-header-actions">
+          {backfill?.running && (
+            <span className="backfill-progress">
+              Updating {backfill.done} of {backfill.total ?? '…'} records…
+            </span>
+          )}
+          {backfill && !backfill.running && backfill.complete && (
+            <span className="backfill-done">
+              {backfill.total === 0 ? 'All records complete' : `Fixed ${backfill.done} of ${backfill.total} records`}
+            </span>
+          )}
+          {backfill?.error && <span className="backfill-error">{backfill.error}</span>}
+          <button
+            className="btn-backfill"
+            onClick={handleBackfill}
+            disabled={backfill?.running || loading}
+            title="Find rows with empty Company/Role/Comp and extract from JD"
+          >
+            {backfill?.running ? 'Fixing…' : 'Fix Missing Data'}
+          </button>
+          <button className="btn-refresh" onClick={() => { load(); loadRoles() }} disabled={loading || backfill?.running}>
+            {loading ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}

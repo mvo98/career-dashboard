@@ -295,6 +295,8 @@ Return a JSON object with this exact structure:
   "hard_skip_triggered": <true | false>,
   "hard_skip_reason": <null or string naming which exact hard skip condition was met>,
   "extracted_comp": <null or string: salary/compensation found ONLY in the JD description body text. CRITICAL: do NOT extract the "Salary:" header line at the top of this input — that is a pre-populated structured field. Only return a value if the job description body itself mentions compensation (look for phrases like "base salary", "salary range", "compensation", "$X–$Y", "OTE", "total compensation", "pay range"). E.g. "$90k–$120k", "$140,000/yr", "Up to $150k + equity". Return null if comp is not mentioned in the body text.>,
+  "extracted_company": <null or string: company name found in the JD, or null if not clearly stated>,
+  "extracted_role": <null or string: exact job title from the JD header or body, or null if not found>,
   "dimensions": {{
     "skill_fit": {{
       "score": <integer 0-100>,
@@ -362,3 +364,35 @@ Return a JSON object with this exact structure:
         result["action"] = "Explore"
 
     return result
+
+
+def extract_jd_metadata(jd: str) -> dict:
+    """Extract company name, role title, and comp from a JD. Returns {company, role, comp}."""
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    prompt = f"""Extract metadata from this job description. Return null for any field not clearly stated.
+
+===== JOB DESCRIPTION =====
+{jd[:6000]}
+
+===== OUTPUT FORMAT =====
+Return a JSON object with exactly these fields:
+{{
+  "company": "<company name, or null>",
+  "role": "<exact job title, or null>",
+  "comp": "<compensation range or amount e.g. '$90k–$120k', '$140,000/yr', 'Up to $150k + equity', or null>"
+}}"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
+        )
+        return json.loads(response.text)
+    except Exception as exc:
+        kind = _classify_gemini_exc(exc)
+        if kind == "overloaded":
+            raise GeminiOverloadedError("Gemini is experiencing high demand.") from exc
+        if kind == "rate_limit":
+            raise GeminiRateLimitError("Rate limit reached.") from exc
+        raise

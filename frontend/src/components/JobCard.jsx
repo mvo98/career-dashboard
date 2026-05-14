@@ -88,7 +88,7 @@ export default function JobCard({ job, onEvaluate, onDismiss, airtableData }) {
 
   async function handleEvaluate() {
     if (job.source !== 'Adzuna') {
-      onEvaluate({ jd: buildJDText(job), company: job.company, role: job.title, url: job.url, source: job.source, jobId: job.id })
+      onEvaluate({ jd: buildJDText(job), company: job.company, role: job.title, url: job.url, source: 'Search', jobId: job.id })
       return
     }
     setFetching(true)
@@ -121,7 +121,7 @@ export default function JobCard({ job, onEvaluate, onDismiss, airtableData }) {
       company: job.company,
       role: job.title,
       url: job.url,
-      source: job.source,
+      source: 'Search',
       jobId: job.id,
       jdIncomplete: incomplete,
     })
@@ -133,7 +133,7 @@ export default function JobCard({ job, onEvaluate, onDismiss, airtableData }) {
       await apiFetch('/api/airtable/dismiss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: job.company, role: job.title, url: job.url, source: job.source }),
+        body: JSON.stringify({ company: job.company, role: job.title, url: job.url, source: 'Search' }),
       })
       onDismiss(job.id)
     } catch {

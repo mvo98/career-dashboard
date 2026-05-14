@@ -21,3 +21,5 @@ class JobFitResponse(BaseModel):
     dimensions: dict[str, DimensionScore]
     talking_points: list[str]
     extracted_comp: Optional[str] = None
+    extracted_company: Optional[str] = None
+    extracted_role: Optional[str] = None

@@ -95,24 +95,35 @@ export default function JobFitEvaluator({
   async function autoSave(evalResult) {
     setSaveStatus('saving')
     const apiSalary = extractCompFromJD(jobDescription)
-    const compValue = mode === 'manual'
-      ? manualComp
+
+    // For manual entries, back-fill empty fields from Gemini extraction
+    const effectiveCompany = company || (mode === 'manual' ? (evalResult.extracted_company || '') : '')
+    const effectiveRole = role || (mode === 'manual' ? (evalResult.extracted_role || '') : '')
+    const effectiveComp = mode === 'manual'
+      ? (manualComp || evalResult.extracted_comp || apiSalary || '')
       : (evalResult.extracted_comp || apiSalary || '')
+
+    if (mode === 'manual') {
+      if (!company && evalResult.extracted_company) setCompany(evalResult.extracted_company)
+      if (!role && evalResult.extracted_role) setRole(evalResult.extracted_role)
+      if (!manualComp && evalResult.extracted_comp) setManualComp(evalResult.extracted_comp)
+    }
+
     try {
       const res = await apiFetch('/api/airtable/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          company,
-          role,
+          company: effectiveCompany,
+          role: effectiveRole,
           fit_score: evalResult.overall_score,
-          comp: compValue,
+          comp: effectiveComp,
           action: evalResult.action,
           rationale: evalResult.action_justification,
           dimensions: evalResult.dimensions,
           full_jd: jobDescription,
           url: initialUrl,
-          source: initialSource,
+          source: mode === 'manual' ? 'Manual' : (initialSource || 'Search'),
         }),
       })
       if (!res.ok) throw new Error()
@@ -184,7 +195,7 @@ export default function JobFitEvaluator({
 
         {mode === 'manual' && (
           <p className="eval-manual-note">
-            Company, Role, and Comp are optional — they'll be saved to Airtable along with the evaluation.
+            Leave blank to auto-extract from the JD — they'll be filled in and saved to Airtable automatically.
           </p>
         )}
 
