@@ -35,6 +35,17 @@ _DIM_MAP = {
 
 _eval_fields_ensured = False
 
+_STATUS_CANONICAL = {s.lower(): s for s in [
+    'Evaluated', 'Applied', 'Responded', 'Scheduled', 'Interviewing',
+    'Offer', 'Rejected', 'Passed', 'Saved', 'Explore', 'Skip', 'Dismissed',
+]}
+
+
+def _canonical_status(s: Optional[str]) -> Optional[str]:
+    if not s:
+        return s
+    return _STATUS_CANONICAL.get(s.strip().lower(), s)
+
 
 def _cfg() -> tuple[str, str, str]:
     return (
@@ -271,7 +282,7 @@ async def get_roles_list() -> list[dict]:
             "company":             company,
             "role":                role,
             "fit_score":           int(fit),
-            "status":              f.get("Status"),
+            "status":              _canonical_status(f.get("Status")),
             "action":              f.get("Action"),
             "date_evaluated":      f.get("Date Evaluated"),
             "materials_generated": bool(f.get("MaterialsGenerated")),

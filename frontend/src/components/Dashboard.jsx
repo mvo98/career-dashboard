@@ -88,10 +88,13 @@ function isoToday() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function matchesFilter(effectiveStatus, filter) {
+function matchesFilter(effectiveStatus, action, filter) {
   if (filter === 'All') return true
-  if (filter === 'Pending') return effectiveStatus === 'Evaluated'
-  return effectiveStatus === filter
+  const s = (effectiveStatus || '').toLowerCase()
+  if (filter === 'Pending') {
+    return s === 'evaluated' && action !== 'Skip' && action !== 'Explore'
+  }
+  return s === filter.toLowerCase()
 }
 
 function StatCard({ label, value, sub }) {
@@ -361,7 +364,7 @@ export default function Dashboard({ active }) {
   const filteredRoles = roles
     ? roles.filter(r => {
         const effectiveStatus = rowEdits[rowKey(r)]?.status ?? r.status ?? ''
-        return matchesFilter(effectiveStatus, activeFilter)
+        return matchesFilter(effectiveStatus, r.action, activeFilter)
       })
     : []
 
